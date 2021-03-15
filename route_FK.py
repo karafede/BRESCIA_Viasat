@@ -84,7 +84,7 @@ cur_HAIG = conn_HAIG.cursor()
 engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_BS')
 
 ### erase existing table...if exists....
-# cur_HAIG.execute("DROP TABLE IF EXISTS route_november_2019 CASCADE")
+# cur_HAIG.execute("DROP TABLE IF EXISTS route_march_2019 CASCADE")
 # conn_HAIG.commit()
 
 #
@@ -100,12 +100,12 @@ engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_V
 #     file.write(str(idterms_cars))
 
 # ## reload 'idterms_cars' as list
-# with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_cars_march_2019.txt", "r") as file:
-#     idterms_cars = eval(file.readline())
+with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_cars_march_2019.txt", "r") as file:
+   idterms_cars = eval(file.readline())
 
 ## reload 'idterms_cars' as list
-with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_cars_november_2019.txt", "r") as file:
-    idterms_cars = eval(file.readline())
+# with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_cars_november_2019.txt", "r") as file:
+#      idterms_cars = eval(file.readline())
 
 
 # idterm = 3504668
@@ -119,7 +119,7 @@ def func(arg):
     idterm = str(idterm)
     # print('VIASAT GPS track:', track_ID)
     viasat_data = pd.read_sql_query('''
-                SELECT * FROM public.routecheck_november_2019 
+                SELECT * FROM public.routecheck_march_2019 
                 WHERE idterm = '%s' ''' % idterm, conn_HAIG)
     viasat_data = viasat_data.sort_values('timedate')
     ## add a field with the "NEXT timedate" in seconds
@@ -149,10 +149,10 @@ def func(arg):
         # else:
         idtrace_o = data[data.segment == min(data.segment)][['id']].iloc[0][0]
         idtrace_d = data[data.segment == max(data.segment)][['id']].iloc[0][0]
-        # latitude_o = data[data.segment == min(data.segment)][['latitude']].iloc[0][0]  ## at the ORIGIN
-        # longitude_o = data[data.segment == min(data.segment)][['longitude']].iloc[0][0]  ## at the ORIGIN
-        # latitude_d = data[data.segment == max(data.segment)][['latitude']].iloc[0][0]  ## at the DESTINATION
-        # longitude_d = data[data.segment == max(data.segment)][['longitude']].iloc[0][0]  ## at the DESTINATION
+        latitude_o = data[data.segment == min(data.segment)][['latitude']].iloc[0][0]  ## at the ORIGIN
+        longitude_o = data[data.segment == min(data.segment)][['longitude']].iloc[0][0]  ## at the ORIGIN
+        latitude_d = data[data.segment == max(data.segment)][['latitude']].iloc[0][0]  ## at the DESTINATION
+        longitude_d = data[data.segment == max(data.segment)][['longitude']].iloc[0][0]  ## at the DESTINATION
         timedate = str(data[data.segment == min(data.segment)][['timedate']].iloc[0][0])  ## at the ORIGIN
         ## trip distance in meters (sum of the increment of the "progressive"
         ## add a field with the "previous progressive"
@@ -164,6 +164,8 @@ def func(arg):
         ## sum all the increments
         # tripdistance_m = sum(data['increment'])
         tripdistance_m = sum(data['increment'][1:len(data['increment'])])
+        if tripdistance_m < 0:
+            tripdistance_m = 0
         ## trip time in seconds (duration)
         time_o = data[data.segment == min(data.segment)][['path_time']].iloc[0][0]
         time_d = data[data.segment == max(data.segment)][['path_time']].iloc[0][0]
@@ -183,10 +185,10 @@ def func(arg):
                                  'idterm': [idterm],
                                  'idtrace_o': [idtrace_o],
                                  'idtrace_d': [idtrace_d],
-                                 # 'latitude_o': [latitude_o],
-                                 # 'longitude_o': [longitude_o],
-                                 # 'latitude_d': [latitude_d],
-                                 # 'longitude_d': [longitude_d],
+                                 'latitude_o': [latitude_o],
+                                 'longitude_o': [longitude_o],
+                                 'latitude_d': [latitude_d],
+                                 'longitude_d': [longitude_d],
                                  'timedate_o': [timedate],
                                  'tripdistance_m': [tripdistance_m],
                                  'triptime_s': [triptime_s],
@@ -194,7 +196,7 @@ def func(arg):
                                  'breaktime_s': [breaktime_s]})
         route_CATANIA = route_CATANIA.append(df_ROUTE)
         connection = engine.connect()
-        route_CATANIA.to_sql("route_november_2019", con=connection, schema="public",
+        route_CATANIA.to_sql("route_march_2019", con=connection, schema="public",
                            if_exists='append')
         connection.close()
 

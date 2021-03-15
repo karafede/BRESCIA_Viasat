@@ -1214,16 +1214,15 @@ Lon_Min_Int =  Lon_Min_Ris+D_lon*M;     Lon_Max_Int = Lon_Max_Ris-D_lon*M
 Lat_Min_Int =  Lat_Min_Ris+D_lat*M;     Lat_Max_Int = Lat_Max_Ris-D_lat*M
 
 M = 1;    #  M = 1.5
-#________________________________________________Coord. UNIVERSITA
+#________________________________________________Coord. UNIVERSITA'
 Coord_Univ = [10.21759, 45.53764]
+Parcheggio_Ingegneria = [10.23051, 45.56499]   ## parcheggio all'aperto
 Lon_Univ     = Coord_Univ[0];       Lat_Univ     = Coord_Univ[1]
 Lon_Min_Univ = Lon_Univ-D_lon*M;    Lon_Max_Univ = Lon_Univ+D_lon*M
 Lat_Min_Univ = Lat_Univ-D_lat*M;    Lat_Max_Univ = Lat_Univ+D_lat*M
 
 
 t0=tempo('INIZIO: ', 0)
-
-
 
 
 # filed = 'C:\\Users\\asus pc\\.spyder-py3\\Mio_BRESCIA_dati\\Marzo_2019\\Dati_con_1576_Veic.csv'
@@ -1314,10 +1313,11 @@ all_VIASAT_IDterminals['vehtype'] = all_VIASAT_IDterminals['vehtype'].astype('In
 # all_VIASAT_IDterminals['portata'] = all_VIASAT_IDterminals['portata'].astype('Int64')
 # make a list of all IDterminals (GPS ID of Viasata data) each ID terminal (track) represent a distinct vehicle
 Veic_considerati = list(all_VIASAT_IDterminals.idterm.unique())
-Veic_considerati = Veic_considerati[10001:20000]
+# Veic_considerati = Veic_considerati[0:20000]
+Veic_considerati = Veic_considerati[20001:40000]
+# Veic_considerati = Veic_considerati[0:300]
 
-
-# track_ID = '4197927'
+# track_ID = '4165307'
 # for kv in  range( len(Veic_considerati[0:30]) ):
 for kv, track_ID in enumerate(Veic_considerati):
     #==============================================================================
@@ -1369,18 +1369,21 @@ for kv, track_ID in enumerate(Veic_considerati):
     dati1v['Day_of_week'] = Day_of_week
     dati1v['Delta_sec']   = Delta_sec
     
-    dati1v['Km'] = (dati1v.speed * dati1v.Delta_sec / 3600).round(4)
+   # dati1v['Km'] = (dati1v.speed * dati1v.Delta_sec / 3600).round(4)
 
     ### modifica by Federico Karagulian 26 Febbraio 2021 #################
     ## --------------------------------------------------- ###############
     dati1v['last_progressive'] = dati1v.progressive.shift()  # <-------
     dati1v.last_progressive = dati1v.last_progressive.fillna(-1)  # <-------
-    progr = dati1v.progressive - dati1v.last_progressive
-    for i in len(dati1v):
-        if dati1v.progressive.iloc[i] > 0:
-            dati1v['Km'] = progr[i]/1000
+    dati1v['km'] = dati1v.progressive - dati1v.last_progressive
+    for i in range(len(dati1v)):
+        if dati1v.km.iloc[i] > 0:
+            dati1v.km.iloc[i] =  dati1v.km.iloc[i] /1000
+        elif dati1v.km.iloc[i] < 0:
+            dati1v.km.iloc[i] = 0
 
-    dati1v['Km_prog'] = np.cumsum(dati1v.Km)
+
+    dati1v['Km_prog'] = np.cumsum(dati1v.km)
     
     if Fl_Tempi:   tempo("==== Dopo creazione nuove Variabili        ", t0)
     
@@ -1421,8 +1424,8 @@ for kv, track_ID in enumerate(Veic_considerati):
     #==================================================================
     #          FA PARTIRE DA ZERO:  DISTANCE e PROGRESSIVE
     #==================================================================
-    dati1v['distance']    = dati1v.distance - dati1v.distance [0]
-    dati1v['progressive'] = dati1v.progressive - dati1v.progressive [0]
+    # dati1v['distance']    = dati1v.distance - dati1v.distance [0]
+    # dati1v['progressive'] = dati1v.progressive - dati1v.progressive [0]
     
     #...............................................
     if Veic_da_Eliminare == 0:       # = 0 il veicolo viene ELABORATO 
@@ -1611,16 +1614,18 @@ df_Eliminati = pd.DataFrame({'Id_veic_elim'   : Id_veic_elim,
 
 tempo("==== Sta salvando il file 'df_Viag'        ", t0)
 # df_Viag.to_csv('df_Viag_0_10000_auto.csv', sep=',')
-df_Viag.to_csv('df_Viag_10001_20000_auto.csv', sep=',')
+# df_Viag.to_csv('df_Viag_0_20000_auto.csv', sep=',')
+df_Viag.to_csv('df_Viag_20001_40000_auto.csv', sep=',')
+
 
 tempo("==== Sta salvando il file 'INFO_Veic'      ", t0)
 # INFO_Veic.to_csv('INFO_Veic_0_10000_auto.csv', sep=',')
-INFO_Veic.to_csv('INFO_Veic_10001_20000_auto.csv', sep=',')
+# INFO_Veic.to_csv('INFO_Veic_0_20000_auto.csv', sep=',')
+INFO_Veic.to_csv('INFO_Veic_20001_40000_auto.csv', sep=',')
 
 # df_Eliminati.to_csv('df_Eliminati_0_10000_auto.csv', sep=',')
-df_Eliminati.to_csv('df_Eliminati_10001_20000_auto.csv', sep=',')
-
-
+# df_Eliminati.to_csv('df_Eliminati_0_20000_auto.csv', sep=',')
+df_Eliminati.to_csv('df_Eliminati_20001_40000_auto.csv', sep=',')
 
 
 

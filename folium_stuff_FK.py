@@ -1,6 +1,5 @@
 
 import os
-os.chdir('D:\\ENEA_CAS_WORK\\Catania_RAFAEL')
 import osmnx as ox
 import networkx as nx
 import numpy as np

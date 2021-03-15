@@ -95,3 +95,57 @@ cur_HAIG.execute("""
 ALTER TABLE public.route_march_2019 ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
 """)
 conn_HAIG.commit()
+
+### create index for 'idterm'
+cur_HAIG.execute("""
+CREATE index route_november_2019_idterm_idx on public.route_november_2019(idterm);
+""")
+conn_HAIG.commit()
+
+
+### create index for 'idterm'
+cur_HAIG.execute("""
+CREATE index route_march_2019_idterm_idx on public.route_march_2019(idterm);
+""")
+conn_HAIG.commit()
+
+
+#################################################
+##### map-matching ##############################
+
+## multiprocess....
+exec(open("map_matching_FK_BRESCIA_MULTIPROCESS.py.py").read())
+
+
+## create index on the column (u,v) togethers in the table 'mapmatching_2017' ###
+cur_HAIG.execute("""
+CREATE INDEX UV_march_only_idx_2019 ON public."mapmatching_ONLY_UNIBS_march_2019"(u,v);
+""")
+conn_HAIG.commit()
+
+
+## create index on the "TRIP_ID" column
+cur_HAIG.execute("""
+CREATE index trip_march_only_2019_idx on public."mapmatching_ONLY_UNIBS_march_2019"("TRIP_ID");
+""")
+conn_HAIG.commit()
+
+
+## create index on the "TRIP_ID" column
+cur_HAIG.execute("""
+CREATE index idtrajectory_march_only_2019_idx on public."mapmatching_ONLY_UNIBS_march_2019"("idtrajectory");
+""")
+conn_HAIG.commit()
+
+
+## create index on the "idtrace" column
+cur_HAIG.execute("""
+CREATE index idrace_march_only_2019_idx on public."mapmatching_ONLY_UNIBS_march_2019"("idtrace");
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index timedate_march_only_2019_idx on public."mapmatching_ONLY_UNIBS_march_2019"(timedate);
+""")
+conn_HAIG.commit()

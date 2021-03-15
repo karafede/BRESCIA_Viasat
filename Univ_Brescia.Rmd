@@ -1,0 +1,291 @@
+---
+title: "Veicoli con sosta presso Universita' di Brescia"
+author:
+- Federico Karagulian
+date: "ultima versione `r format(Sys.time(), '%d %B %Y, %H:%M')`"
+output:
+  word_document: 
+    reference_docx: word_style_FK.docx
+  pdf_document: default
+  html_document: default
+  number_sections: true
+  bookdown::word_document: default
+---
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 1.**"}
+
+
+rm(list = ls())
+
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(readr)
+library(broom)
+library(threadr)
+library(dplyr)
+library(dygraphs)
+library(ggpmisc)
+library(plotly)
+library(GGally)
+library(htmlwidgets)
+library(htmltools)
+library(webshot)
+library(ggrepel)
+library(openair)
+library(widgetframe)
+library(grid)
+library(gridExtra)
+library(pander)
+library(varhandle)
+options(scipen=5)
+options(warn=-1)
+library(RPostgreSQL)
+
+setwd("D:/ENEA_CAS_WORK/BRESCIA")
+
+
+# loads the PostgreSQL driver
+drv <- dbDriver("PostgreSQL")
+
+## connect to the Brescia PostgreSQL DB
+conn_HAIG <- dbConnect(drv, dbname = "HAIG_Viasat_BS",
+                       host = "10.0.0.1", port = 5432,       
+                       user = "postgres", password = "superuser")
+
+
+#### --------------------------------- #########
+#### load all "viaggi" for CARS ################
+#### elaborations from Federico Karagulian #####
+
+df_BRESCIA_march_2019 = dbGetQuery(conn_HAIG, "
+                                    SELECT *
+                                    FROM route_march_2019
+                                    ")
+
+df_BRESCIA_november_2019 = dbGetQuery(conn_HAIG, "
+                                    SELECT *
+                                    FROM route_november_2019
+                                    ")
+df_BRESCIA_FK <- rbind(df_BRESCIA_march_2019, df_BRESCIA_november_2019)
+remove(df_BRESCIA_march_2019, df_BRESCIA_november_2019)
+df_BRESCIA_FK <- df_BRESCIA_FK %>%
+  mutate(month = month(timedate_o))
+
+## filter data within a rectangle around the parking of the "Facolta' di Ingegneria, Univ. Brescia"
+## Parcheggio_Ingegneria 
+lon_ing = 10.23051 
+lat_ing = 45.56499 
+## 100 meters 
+delta_lon = 0.0013
+delta_lat = 0.0009 
+## remove also vehicles whose origin is already within the rectangle.
+AAA_FK <- df_BRESCIA_FK %>%
+  filter( (longitude_d <  lon_ing + delta_lon & longitude_d >  lon_ing - delta_lon
+         & latitude_d < lat_ing +  delta_lat & latitude_d > lat_ing -  delta_lat) 
+         & !(longitude_o <  lon_ing + delta_lon & longitude_o >  lon_ing - delta_lon
+         & latitude_o < lat_ing +  delta_lat & latitude_o > lat_ing -  delta_lat)) %>%
+  group_by(idterm) %>%
+  summarise(length(idterm))
+write.csv(AAA_FK, "idterm_UNIBS.csv")
+
+## get all TRIPS (idtrajectory) going to the University (March and November 2019)
+trips_march <- df_BRESCIA_FK %>%
+  filter( (longitude_d <  lon_ing + delta_lon & longitude_d >  lon_ing - delta_lon
+         & latitude_d < lat_ing +  delta_lat & latitude_d > lat_ing -  delta_lat) 
+         & !(longitude_o <  lon_ing + delta_lon & longitude_o >  lon_ing - delta_lon
+         & latitude_o < lat_ing +  delta_lat & latitude_o > lat_ing -  delta_lat)) %>%
+  filter(month == 3)
+
+write.csv(trips_march, "trips_MARCH_UNIBS.csv")
+
+
+
+trips_november <- df_BRESCIA_FK %>%
+  filter( (longitude_d <  lon_ing + delta_lon & longitude_d >  lon_ing - delta_lon
+         & latitude_d < lat_ing +  delta_lat & latitude_d > lat_ing -  delta_lat) 
+         & !(longitude_o <  lon_ing + delta_lon & longitude_o >  lon_ing - delta_lon
+         & latitude_o < lat_ing +  delta_lat & latitude_o > lat_ing -  delta_lat)) %>%
+  filter(month == 11)
+
+write.csv(trips_november, "trips_NOVEMBER_UNIBS.csv")
+
+
+## summary statistics by DAY of the WEEK #############
+trips <- rbind(trips_march,
+               trips_november)
+## assign name to month
+trips$month <- as.factor(trips$month)
+trips$month <- gsub(3, "march", (trips$month))
+trips$month <- gsub(11, "november", (trips$month))
+trips$hour <- hour(trips$timedate_o)
+trips$day <- weekdays(as.Date(trips$timedate_o))
+
+trips <- trips %>%
+  group_by(month, day) %>%
+  summarise(count = length(idterm),
+            total_km = sum(tripdistance_m/1000)) 
+
+trips <- as.data.frame(trips)
+categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
+
+p <- ggplot(data = trips,
+            aes(day, total_km, fill = day)) + guides(fill=FALSE) +
+  geom_bar(stat="identity") +
+  facet_wrap( ~ month, scales = "free_y") +
+  guides(fill=FALSE) +
+  scale_x_discrete(limits = categories) +
+  # ylim(0, 25) +
+  theme_bw() +
+  theme( strip.text = element_text(size = 13)) +
+  theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+  theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+  theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+  ylab("Km percorsi") +            # Set y-axis label
+  theme(axis.title.y = element_text(face="bold", colour="black", size=12),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=11)) +
+  xlab("") +            # Set y-axis label
+  theme(axis.title.x = element_text(face="bold", colour="black", size=12),
+        axis.text.x  = element_text(angle=45, vjust=1, size=12)) +
+  # geom_text(aes(label = paste(mean, "%")), size = 4, hjust = 0.5,  vjust = -0.5) +
+  ggtitle("Km percorsi per recarsi all'Università (Via Branze 37, Brescia)") + 
+  theme(plot.title = element_text(lineheight=.8, face="bold"))
+p
+
+
+````
+
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 4e.** Numero di passaggi orari per giorni feriali e per classe di autoveicoli sul tratto dell'autostrada A2 (km5+004) nella direzione verso Salerno."}
+
+
+### summary statistics by HOUR
+trips <- rbind(trips_march,
+               trips_november)
+## assign name to month
+trips$month <- as.factor(trips$month)
+trips$month <- gsub(3, "march", (trips$month))
+trips$month <- gsub(11, "november", (trips$month))
+trips$hour <- hour(trips$timedate_o)
+trips$day <- weekdays(as.Date(trips$timedate_o))
+
+trips <- trips %>%
+  group_by(month, hour) %>%
+  summarise(count = length(idterm),
+            total_km = sum(tripdistance_m/1000)) 
+
+trips$hour <- unfactor(trips$hour)
+trips$hour <- as.numeric(trips$hour)
+
+
+p <- ggplot(data = trips,
+              aes(hour, total_km, fill = hour)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") + 
+    facet_wrap( ~ month, scales = "free_y") +
+    guides(fill=FALSE) +
+    # ylim(0, 25) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 13)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("Km percorsi") +            # Set y-axis label
+    theme(axis.title.y = element_text(face="bold", colour="black", size=12),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=11)) +
+    xlab("") +            # Set y-axis label
+    theme(axis.title.x = element_text(face="bold", colour="black", size=12),
+          axis.text.x  = element_text(angle=0, vjust=1, hjust=0.5, size=8)) +
+   scale_x_continuous(breaks=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14, 15,16,17,18,19,20,21,22,23)) +
+    ggtitle("Km percorsi per recarsi all'Università (Via Branze 37, Brescia)") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+p
+
+
+### make a query of a particulare "idterm" in the "routecheck" table
+# BBB = dbGetQuery(conn_HAIG, "SELECT *
+#                              FROM routecheck_november_2019
+#                              WHERE idterm = '5208638'
+#                                     ")
+
+
+````
+
+
+*<br/><br/>*
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 1.**"}
+
+
+
+#### --------------------------------- #####
+#### load all "viaggi" for CARS ############
+#### elaboration from Giancarlo Giuli ######
+
+df_BRESCIA_1 <- read_csv('df_Viag_0_20000_auto.csv')[-1]
+df_BRESCIA_2 <- read_csv('df_Viag_20001_40000_auto.csv')[-1]
+df_BRESCIA_GG <- rbind(df_BRESCIA_1, df_BRESCIA_2)
+remove(df_BRESCIA_1, df_BRESCIA_2)
+
+
+## filter data within a rectangle around the parking of the "Facolta' di Ingegneria, Univ. Brescia"
+## Parcheggio_Ingegneria 
+lon_ing = 10.23051 
+lat_ing = 45.56499 
+## 100 meters 
+delta_lon = 0.0013
+delta_lat = 0.0009 
+## remove also vehicles whose origin is already within the rectangle.
+AAA_GG <- df_BRESCIA_GG %>%
+  filter( (D_long <  lon_ing + delta_lon & D_long >  lon_ing - delta_lon
+         & D_lati < lat_ing +  delta_lat & D_lati > lat_ing -  delta_lat) 
+         & !(O_long <  lon_ing + delta_lon & O_long >  lon_ing - delta_lon
+         & O_lati < lat_ing +  delta_lat & O_lati > lat_ing -  delta_lat)) %>%
+  group_by(Id_Term) %>%
+  summarise(length(Id_Term))
+
+````
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 1.**"}
+
+
+##############################################################
+####### results from map-matching ############################
+####### -------------------------- ###########################
+
+## load EDGE files with all info of the road network over Brescia
+EDGES <- read.csv("D:/ENEA_CAS_WORK/BRESCIA/gdf_edges_BRESCIA_all.csv")[-1]
+EDGES <- as.data.frame(EDGES)
+## skip "geometry"
+EDGES <- EDGES[, names(EDGES)[which(names(EDGES) != "geometry")]]
+# remove duplicates of u & v
+EDGES <- EDGES %>%
+  distinct(u, v, .keep_all = TRUE) 
+EDGES$ID <- 1:nrow(EDGES)
+
+
+#### load map-matching data for all vehicles who stops at the University of Brecia at least one time in March 2019
+mapmaching_UNIBS_all_march_2019 = dbGetQuery(conn_HAIG, "
+                                    SELECT *
+                                    FROM \"mapmatching_UNIBS_march_2019\"
+                                    ")
+## join EDGES with mapmaching_UNIBS_all_march_2019
+mapmaching_UNIBS_all_march_2019 <- mapmaching_UNIBS_all_march_2019 %>%
+  left_join(EDGES, by = c("u", "v", "length"))
+
+## get al data of CARS enteirng the parking lot of the University of Brescia
+parking_unibs <- mapmaching_UNIBS_all_march_2019 %>%
+  filter(u == c("410689924") & 
+           v == c("410689923"))
+
+
+````
+

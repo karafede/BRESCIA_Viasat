@@ -346,6 +346,7 @@ conn_HAIG.commit()
 
 
 
+
 cur_HAIG.execute("""
 CREATE index routecheck_november_2019_TRIP_ID_idx on public.routecheck_november_2019("TRIP_ID");
 """)
@@ -562,3 +563,7 @@ conn_HAIG.commit()
 '''
 
 
+############################################################3
+# df_viaggi1 = pd.read_csv('D:\\ENEA_CAS_WORK\\BRESCIA\\df_Viag_0_20000_auto.csv', delimiter=',')
+# df_viaggi2 = pd.read_csv('D:\\ENEA_CAS_WORK\\BRESCIA\\df_Viag_20001_40000_auto.csv', delimiter=',')
+# tot_len = len(df_viaggi1) + len(df_viaggi2)

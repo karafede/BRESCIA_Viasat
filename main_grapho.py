@@ -21,7 +21,7 @@ road_type = ['motorway', 'motorway_link', 'secondary', 'primary', 'tertiary', 'r
 
 # roads = road_type.replace(', ', '|')
 # filter = '["highway"~' + '"' + roads + '"' + "]"
-distance = 110000 # distance from the center of the map (in meters)
+distance = 50000 # distance from the center of the map (in meters)
 
 # make grapho, save .graphml, save shapefile (node and edges) and get statistics (basic and extended)
 ###########################################
@@ -29,12 +29,11 @@ distance = 110000 # distance from the center of the map (in meters)
 ###########################################
 network_city = graph(place_country, distance) # filter
 
-# file_graphml = 'Catania__Italy_60km.graphml'
-file_graphml = 'Brescia__Italy.graphml'
+file_graphml = 'Brescia_50km__Italy.graphml'
 grafo = ox.load_graphml(file_graphml)
 # ox.plot_graph(grafo)
 gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
-gdf_edges.to_csv('grapho_ROMA_70km_2021.csv')
+# gdf_edges.to_csv('grapho_BRESCIA_60km_2021.csv')
 gdf_edges.plot()
 
 ## make an iterative map
@@ -72,13 +71,14 @@ file_graphml = 'Brescia__Italy.graphml'
 cost_assignment(file_graphml, place_country)
 
 
+
 '''
 # plot all the network on the map with folium
 # load file graphml
-Catania = ox.load_graphml('partial_OSM.graphml')
-Catania = ox.plot_graph_folium(Catania, graph_map=None, popup_attribute=None, tiles='cartodbpositron', zoom=10,
+Brescia = ox.load_graphml('partial_OSM.graphml')
+Brescia = ox.plot_graph_folium(Catania, graph_map=None, popup_attribute=None, tiles='cartodbpositron', zoom=10,
                   fit_bounds=True, edge_width=1, edge_opacity=1)
-Catania.save("partial_OSM.html")
+Brescia.save("Brescia_OSM.html")
 '''
 
 
