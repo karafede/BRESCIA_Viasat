@@ -4,7 +4,7 @@
 #####################################
 
 import os
-os.chdir('D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data')
+os.chdir('D:/ENEA_CAS_WORK/BRESCIA')
 os.getcwd()
 
 import numpy as np
@@ -108,7 +108,7 @@ with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_cars_march_2019.txt", "r") as file:
 #      idterms_cars = eval(file.readline())
 
 
-# idterm = 3504668
+# idterm = 3199037
 
 def func(arg):
     last_idterm_idx, idterm = arg
@@ -131,7 +131,7 @@ def func(arg):
     all_trips = list(viasat_data.idtrajectory.unique())
     for idx, idtrajectory in enumerate(all_trips):
         ### initialize an empty dataframe
-        route_CATANIA = pd.DataFrame([])
+        route_BRESCIA = pd.DataFrame([])
         # print(idtrajectory)
         # idtrajectory=80741261
         # idtrajectory = 78788305
@@ -153,7 +153,8 @@ def func(arg):
         longitude_o = data[data.segment == min(data.segment)][['longitude']].iloc[0][0]  ## at the ORIGIN
         latitude_d = data[data.segment == max(data.segment)][['latitude']].iloc[0][0]  ## at the DESTINATION
         longitude_d = data[data.segment == max(data.segment)][['longitude']].iloc[0][0]  ## at the DESTINATION
-        timedate = str(data[data.segment == min(data.segment)][['timedate']].iloc[0][0])  ## at the ORIGIN
+        timedate_o = str(data[data.segment == min(data.segment)][['timedate']].iloc[0][0])  ## at the ORIGIN
+        timedate_d = str(data[data.segment == max(data.segment)][['timedate']].iloc[0][0])  ## at the DESTINATION
         ## trip distance in meters (sum of the increment of the "progressive"
         ## add a field with the "previous progressive"
         data['last_progressive'] = data.progressive.shift()  # <-------
@@ -189,14 +190,15 @@ def func(arg):
                                  'longitude_o': [longitude_o],
                                  'latitude_d': [latitude_d],
                                  'longitude_d': [longitude_d],
-                                 'timedate_o': [timedate],
+                                 'timedate_o': [timedate_o],
+                                 'timedate_d': [timedate_d],
                                  'tripdistance_m': [tripdistance_m],
                                  'triptime_s': [triptime_s],
                                  'checkcode': [checkcode],
                                  'breaktime_s': [breaktime_s]})
-        route_CATANIA = route_CATANIA.append(df_ROUTE)
+        route_BRESCIA = route_BRESCIA.append(df_ROUTE)
         connection = engine.connect()
-        route_CATANIA.to_sql("route_march_2019", con=connection, schema="public",
+        route_BRESCIA.to_sql("route_march_2019", con=connection, schema="public",
                            if_exists='append')
         connection.close()
 

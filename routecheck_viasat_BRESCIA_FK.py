@@ -152,8 +152,8 @@ def func(arg):
 
         #### select only YEAR 2019 ######
         #################################
-        viasat = viasat[viasat.year_month == '2019-03']  ## March
-        # viasat = viasat[viasat.year_month == '2019-11']  ## November
+        # viasat = viasat[viasat.year_month == '2019-03']  ## March
+        viasat = viasat[viasat.year_month == '2019-11']  ## November
         if len(viasat) > 0:
             viasat = viasat.sort_values('timedate')
             # make one field with time in seconds
@@ -432,7 +432,7 @@ def func(arg):
 
                                 #### Connect to database using a context manager and populate the DB ####
                                 connection = engine.connect()
-                                VIASAT_TRIP.to_sql("routecheck_march_2019", con=connection, schema="public",
+                                VIASAT_TRIP.to_sql("routecheck_november_2019", con=connection, schema="public",
                                                    if_exists='append')
                                 connection.close()
 

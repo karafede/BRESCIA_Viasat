@@ -1,5 +1,5 @@
 ---
-title: "Veicoli con sosta presso Universita' di Brescia"
+title: "Veicoli con sosta presso Università di Brescia"
 author:
 - Federico Karagulian
 date: "ultima versione `r format(Sys.time(), '%d %B %Y, %H:%M')`"
@@ -15,8 +15,7 @@ output:
 *<br/><br/>*
 
 
-````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 1.**"}
-
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 1.** Km percorsi per recarsi all'Università (Via Branze 37, Brescia) per giorno della settimana."}
 
 rm(list = ls())
 
@@ -73,56 +72,87 @@ df_BRESCIA_november_2019 = dbGetQuery(conn_HAIG, "
 df_BRESCIA_FK <- rbind(df_BRESCIA_march_2019, df_BRESCIA_november_2019)
 remove(df_BRESCIA_march_2019, df_BRESCIA_november_2019)
 df_BRESCIA_FK <- df_BRESCIA_FK %>%
-  mutate(month = month(timedate_o))
+  mutate(month = month(timedate_d))
 
 ## filter data within a rectangle around the parking of the "Facolta' di Ingegneria, Univ. Brescia"
 ## Parcheggio_Ingegneria 
 lon_ing = 10.23051 
 lat_ing = 45.56499 
-## 100 meters 
-delta_lon = 0.0013
-delta_lat = 0.0009 
+## 50 meters 
+delta_lon = 0.00067
+delta_lat = 0.00047 
 ## remove also vehicles whose origin is already within the rectangle.
-AAA_FK <- df_BRESCIA_FK %>%
+all_trips_FK <- df_BRESCIA_FK %>%
   filter( (longitude_d <  lon_ing + delta_lon & longitude_d >  lon_ing - delta_lon
          & latitude_d < lat_ing +  delta_lat & latitude_d > lat_ing -  delta_lat) 
          & !(longitude_o <  lon_ing + delta_lon & longitude_o >  lon_ing - delta_lon
          & latitude_o < lat_ing +  delta_lat & latitude_o > lat_ing -  delta_lat)) %>%
   group_by(idterm) %>%
-  summarise(length(idterm))
-write.csv(AAA_FK, "idterm_UNIBS.csv")
+  summarise(count = length(idterm))
+write.csv(all_trips_FK, "idterm_UNIBS.csv")
 
-## get all TRIPS (idtrajectory) going to the University (March and November 2019)
-trips_march <- df_BRESCIA_FK %>%
+
+## get all TRIPS (idtrajectory) going to the University (March and November 2019)  breaktime_s are in seconds
+trips_march_FK <- df_BRESCIA_FK %>%
   filter( (longitude_d <  lon_ing + delta_lon & longitude_d >  lon_ing - delta_lon
          & latitude_d < lat_ing +  delta_lat & latitude_d > lat_ing -  delta_lat) 
          & !(longitude_o <  lon_ing + delta_lon & longitude_o >  lon_ing - delta_lon
          & latitude_o < lat_ing +  delta_lat & latitude_o > lat_ing -  delta_lat)) %>%
-  filter(month == 3)
+  filter(month == 3 & breaktime_s > 60 & breaktime_s < 100000)
 
-write.csv(trips_march, "trips_MARCH_UNIBS.csv")
+write.csv(trips_march_FK, "trips_MARCH_UNIBS.csv")
 
 
 
-trips_november <- df_BRESCIA_FK %>%
+trips_november_FK <- df_BRESCIA_FK %>%
   filter( (longitude_d <  lon_ing + delta_lon & longitude_d >  lon_ing - delta_lon
          & latitude_d < lat_ing +  delta_lat & latitude_d > lat_ing -  delta_lat) 
          & !(longitude_o <  lon_ing + delta_lon & longitude_o >  lon_ing - delta_lon
          & latitude_o < lat_ing +  delta_lat & latitude_o > lat_ing -  delta_lat)) %>%
-  filter(month == 11)
+  filter(month == 11 & breaktime_s > 60 & breaktime_s < 100000)
 
-write.csv(trips_november, "trips_NOVEMBER_UNIBS.csv")
+write.csv(trips_november_FK, "trips_NOVEMBER_UNIBS.csv")
 
 
 ## summary statistics by DAY of the WEEK #############
-trips <- rbind(trips_march,
-               trips_november)
+trips <- rbind(trips_march_FK,
+               trips_november_FK)
 ## assign name to month
 trips$month <- as.factor(trips$month)
-trips$month <- gsub(3, "march", (trips$month))
-trips$month <- gsub(11, "november", (trips$month))
-trips$hour <- hour(trips$timedate_o)
-trips$day <- weekdays(as.Date(trips$timedate_o))
+trips$month <- gsub(3, "marzo", (trips$month))
+trips$month <- gsub(11, "novembre", (trips$month))
+trips$hour <- hour(trips$timedate_d)
+trips$day <- weekdays(as.Date(trips$timedate_d))
+
+#####---------------------------------------########
+#### table per Natascia x modelling ################
+#### --------------------------------------- #######
+
+trips_natascia_march <- trips %>%
+  filter(month == "marzo") %>%
+  dplyr::select(idterm,
+                idtrajectory,
+                timedate_d,
+                breaktime_s,
+                tripdistance_m)
+trips_natascia_march$breaktime_hours <- trips_natascia_march$breaktime_s/3600
+trips_natascia_march$tripdistance_km <- trips_natascia_march$tripdistance_m/1000
+
+
+
+trips_natascia_november <- trips %>%
+  filter(month == "novembre") %>%
+  dplyr::select(idterm,
+                idtrajectory,
+                timedate_d,
+                breaktime_s,
+                tripdistance_m)
+trips_natascia_november$breaktime_hours <- trips_natascia_november$breaktime_s/3600
+trips_natascia_november$tripdistance_km <- trips_natascia_november$tripdistance_m/1000
+
+#### --------------------------------------- ###########################################
+#### --------------------------------------- ###########################################
+#### --------------------------------------- ###########################################
 
 trips <- trips %>%
   group_by(month, day) %>%
@@ -138,20 +168,20 @@ p <- ggplot(data = trips,
   facet_wrap( ~ month, scales = "free_y") +
   guides(fill=FALSE) +
   scale_x_discrete(limits = categories) +
-  # ylim(0, 25) +
+  ylim(0, 250) +
   theme_bw() +
-  theme( strip.text = element_text(size = 13)) +
+  theme( strip.text = element_text(size = 15)) +
   theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
   theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
   theme(axis.title.x = element_blank()) +                  # Remove x-axis label
   ylab("Km percorsi") +            # Set y-axis label
-  theme(axis.title.y = element_text(face="bold", colour="black", size=12),
-        axis.text.y  = element_text(angle=0, vjust=0.5, size=11)) +
+  theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
   xlab("") +            # Set y-axis label
-  theme(axis.title.x = element_text(face="bold", colour="black", size=12),
-        axis.text.x  = element_text(angle=45, vjust=1, size=12)) +
-  # geom_text(aes(label = paste(mean, "%")), size = 4, hjust = 0.5,  vjust = -0.5) +
-  ggtitle("Km percorsi per recarsi all'Università (Via Branze 37, Brescia)") + 
+  theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+        axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
+  geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+  ggtitle("Km totali percorsi per recarsi all'Università (Via Branze 37, Brescia)") + 
   theme(plot.title = element_text(lineheight=.8, face="bold"))
 p
 
@@ -161,26 +191,28 @@ p
 
 *<br/><br/>*
 
-````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 4e.** Numero di passaggi orari per giorni feriali e per classe di autoveicoli sul tratto dell'autostrada A2 (km5+004) nella direzione verso Salerno."}
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 2.** Km percorsi per recarsi all'Università (Via Branze 37, Brescia) per ora della giornata."}
 
+
+#### elaborations from Federico Karagulian #####
 
 ### summary statistics by HOUR
-trips <- rbind(trips_march,
-               trips_november)
+trips <- rbind(trips_march_FK,
+               trips_november_FK)
 ## assign name to month
 trips$month <- as.factor(trips$month)
-trips$month <- gsub(3, "march", (trips$month))
-trips$month <- gsub(11, "november", (trips$month))
-trips$hour <- hour(trips$timedate_o)
-trips$day <- weekdays(as.Date(trips$timedate_o))
+trips$month <- gsub(3, "marzo", (trips$month))
+trips$month <- gsub(11, "novembre", (trips$month))
+trips$hour <- hour(trips$timedate_d)
+trips$day <- weekdays(as.Date(trips$timedate_d))
 
 trips <- trips %>%
   group_by(month, hour) %>%
   summarise(count = length(idterm),
             total_km = sum(tripdistance_m/1000)) 
 
-trips$hour <- unfactor(trips$hour)
-trips$hour <- as.numeric(trips$hour)
+# trips$hour <- unfactor(trips$hour)
+# trips$hour <- as.numeric(trips$hour)
 
 
 p <- ggplot(data = trips,
@@ -188,20 +220,22 @@ p <- ggplot(data = trips,
     geom_bar(stat = "identity") + 
     facet_wrap( ~ month, scales = "free_y") +
     guides(fill=FALSE) +
-    # ylim(0, 25) +
+    ylim(0, 310) +
     theme_bw() +
-    theme( strip.text = element_text(size = 13)) +
+    theme( strip.text = element_text(size = 15)) +
     theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
     theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
     theme(axis.title.x = element_blank()) +                  # Remove x-axis label
     ylab("Km percorsi") +            # Set y-axis label
-    theme(axis.title.y = element_text(face="bold", colour="black", size=12),
-          axis.text.y  = element_text(angle=0, vjust=0.5, size=11)) +
+    theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
     xlab("") +            # Set y-axis label
     theme(axis.title.x = element_text(face="bold", colour="black", size=12),
-          axis.text.x  = element_text(angle=0, vjust=1, hjust=0.5, size=8)) +
-   scale_x_continuous(breaks=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14, 15,16,17,18,19,20,21,22,23)) +
-    ggtitle("Km percorsi per recarsi all'Università (Via Branze 37, Brescia)") + 
+          axis.text.x  = element_text(angle=0, vjust=1, hjust=0.5, size=15)) +
+    # scale_x_continuous(breaks=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)) +
+    scale_x_continuous(breaks=c(5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)) +
+    geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+    ggtitle("Km totali percorsi per recarsi all'Università (Via Branze 37, Brescia)") + 
     theme(plot.title = element_text(lineheight=.8, face="bold"))
 p
 
@@ -220,9 +254,193 @@ p
 
 
 
-````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 1.**"}
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 3.** Tempi medi di sosta all'Università (Via Branze 37, Brescia) per giorno della settimana."}
 
 
+
+## summary statistics by DAY of the WEEK #############
+trips <- rbind(trips_march_FK,
+               trips_november_FK)
+## assign name to month
+trips$month <- as.factor(trips$month)
+trips$month <- gsub(3, "marzo", (trips$month))
+trips$month <- gsub(11, "novembre", (trips$month))
+trips$hour <- hour(trips$timedate_o)
+trips$day <- weekdays(as.Date(trips$timedate_o))
+
+trips <- trips %>%
+  group_by(month, day) %>%
+  summarise(count = length(idterm),
+            total_km = sum(tripdistance_m/1000),
+            mean_stop_time = mean(breaktime_s/3600, na.rm = T)) 
+
+trips <- as.data.frame(trips)
+categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
+
+p <- ggplot(data = trips,
+            aes(day, mean_stop_time, fill = day)) + guides(fill=FALSE) +
+  geom_bar(stat="identity") +
+  facet_wrap( ~ month, scales = "free_y") +
+  guides(fill=FALSE) +
+  scale_x_discrete(limits = categories) +
+  ylim(0, 12) +
+  theme_bw() +
+  theme( strip.text = element_text(size = 15)) +
+  theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+  theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+  theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+  ylab("Tempo sosta medio (h)") +            # Set y-axis label
+  theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+  xlab("") +            # Set y-axis label
+  theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+        axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
+  geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+  ggtitle("Tempi medi di sosta all'Università (Via Branze 37, Brescia)") + 
+  theme(plot.title = element_text(lineheight=.8, face="bold"))
+p
+
+
+````
+
+
+
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 1a.** Distanza settimanale percosa dai veicoli che almeno una volta si recano all'Università"}
+
+all_trips <- all_trips_FK %>%
+   left_join(df_BRESCIA_FK, by = c("idterm"))
+
+#####---------------------------------------########
+#### table per Natascia x modelling ################
+#### --------------------------------------- #######
+
+all_trips_natascia <- all_trips %>%
+  dplyr::select(idterm,
+                idtrajectory,
+                timedate_d,
+                breaktime_s,
+                tripdistance_m)
+all_trips_natascia$breaktime_hours <- all_trips_natascia$breaktime_s/3600
+all_trips_natascia$tripdistance_km <- all_trips_natascia$tripdistance_m/1000
+
+
+#### --------------------------------------- #######
+#### --------------------------------------- #######
+#### --------------------------------------- #######
+
+## summary statistics by DAY of the WEEK #############
+## assign name to month
+all_trips$month <- as.factor(all_trips$month)
+all_trips$month <- gsub(3, "marzo", (all_trips$month))
+all_trips$month <- gsub(11, "novembre", (all_trips$month))
+all_trips$hour <- hour(all_trips$timedate_o)
+all_trips$day <- weekdays(as.Date(all_trips$timedate_o))
+
+all_trips <- all_trips %>%
+  group_by(month, day) %>%
+  summarise(count = length(idterm),
+            total_km = sum(tripdistance_m/1000)) 
+
+all_trips <- as.data.frame(all_trips)
+categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
+
+p <- ggplot(data = all_trips,
+            aes(day, total_km, fill = day)) + guides(fill=FALSE) +
+  geom_bar(stat="identity") +
+  facet_wrap( ~ month, scales = "free_y") +
+  guides(fill=FALSE) +
+  scale_x_discrete(limits = categories) +
+  ylim(0, 4500) +
+  theme_bw() +
+  theme( strip.text = element_text(size = 15)) +
+  theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+  theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+  theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+  ylab("Km percorsi") +            # Set y-axis label
+  theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+  xlab("") +            # Set y-axis label
+  theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+        axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
+  geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+  ggtitle("Km percorsi dai veicoli che sostano almeno una volta all'Univeristà (Via Branze 37, Brescia)") + 
+  theme(plot.title = element_text(lineheight=.8, face="bold"))
+p
+
+
+
+
+````
+
+*<br/><br/>*
+
+
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 2a.** Distanza oraria percosa dai veicoli che almeno una volta si recano all'Università"}
+
+
+#### elaborations from Federico Karagulian #####
+
+all_trips <- all_trips_FK %>%
+   left_join(df_BRESCIA_FK, by = c("idterm"))
+
+
+## summary statistics by DAY of the WEEK #############
+## assign name to month
+all_trips$month <- as.factor(all_trips$month)
+all_trips$month <- gsub(3, "marzo", (all_trips$month))
+all_trips$month <- gsub(11, "novembre", (all_trips$month))
+all_trips$hour <- hour(all_trips$timedate_o)
+all_trips$day <- weekdays(as.Date(all_trips$timedate_o))
+
+all_trips <- all_trips %>%
+  group_by(month, hour) %>%
+  summarise(count = length(idterm),
+            total_km = sum(tripdistance_m/1000)) 
+
+
+p <- ggplot(data = all_trips,
+              aes(hour, total_km, fill = hour)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") + 
+    facet_wrap( ~ month, scales = "free_y") +
+    guides(fill=FALSE) +
+    ylim(0, 2000) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 15)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("Km percorsi") +            # Set y-axis label
+    theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+    xlab("") +            # Set y-axis label
+    theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+          axis.text.x  = element_text(angle=0, vjust=1, hjust=0.5, size=14)) +
+    # scale_x_continuous(breaks=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)) +
+   # scale_x_continuous(breaks=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)) +
+    # geom_text(aes(label = paste(count, sep = "")), size = 3, hjust = 0.5, vjust = -0.5) +
+    geom_text_repel(aes(label=count), vjust=1, color="black",
+            position = position_stack(1), size=4)+
+    ggtitle("Km percorsi da veicoli che sostano almeno una volta all'Univeristà") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+p
+
+
+
+
+
+````
+
+
+
+*<br/><br/>*
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 4.** Km percorsi per recarsi all'Università (Via Branze 37, Brescia) per giorno della settimana."}
 
 #### --------------------------------- #####
 #### load all "viaggi" for CARS ############
@@ -232,15 +450,17 @@ df_BRESCIA_1 <- read_csv('df_Viag_0_20000_auto.csv')[-1]
 df_BRESCIA_2 <- read_csv('df_Viag_20001_40000_auto.csv')[-1]
 df_BRESCIA_GG <- rbind(df_BRESCIA_1, df_BRESCIA_2)
 remove(df_BRESCIA_1, df_BRESCIA_2)
+df_BRESCIA_GG <- df_BRESCIA_GG %>%
+  mutate(month = month(O_Data))
 
 
 ## filter data within a rectangle around the parking of the "Facolta' di Ingegneria, Univ. Brescia"
 ## Parcheggio_Ingegneria 
 lon_ing = 10.23051 
 lat_ing = 45.56499 
-## 100 meters 
-delta_lon = 0.0013
-delta_lat = 0.0009 
+## 50 meters 
+delta_lon = 0.00067
+delta_lat = 0.00047  
 ## remove also vehicles whose origin is already within the rectangle.
 AAA_GG <- df_BRESCIA_GG %>%
   filter( (D_long <  lon_ing + delta_lon & D_long >  lon_ing - delta_lon
@@ -250,19 +470,226 @@ AAA_GG <- df_BRESCIA_GG %>%
   group_by(Id_Term) %>%
   summarise(length(Id_Term))
 
+write.csv(AAA_GG, "idterm_UNIBS_Giuli.csv")
+
+
+## get all TRIPS (idtrajectory) going to the University (March and November 2019)
+trips_march_GG <- df_BRESCIA_GG %>%
+  filter( (D_long <  lon_ing + delta_lon & D_long >  lon_ing - delta_lon
+         & D_lati < lat_ing +  delta_lat & D_lati > lat_ing -  delta_lat) 
+         & !(O_long <  lon_ing + delta_lon & O_long >  lon_ing - delta_lon
+         & O_lati < lat_ing +  delta_lat & O_lati > lat_ing -  delta_lat)) %>%
+  filter(month == 3 & Viag_Durata <=2 &  Viag_Durata >0.0166 & Viag_Km > 1)
+
+write.csv(trips_march_GG, "trips_MARCH_UNIBS_Giuli.csv")
+
+
+
+trips_november_GG <- df_BRESCIA_GG %>%
+ filter( (D_long <  lon_ing + delta_lon & D_long >  lon_ing - delta_lon
+         & D_lati < lat_ing +  delta_lat & D_lati > lat_ing -  delta_lat) 
+         & !(O_long <  lon_ing + delta_lon & O_long >  lon_ing - delta_lon
+         & O_lati < lat_ing +  delta_lat & O_lati > lat_ing -  delta_lat)) %>%
+  filter(month == 11  & Viag_Durata <=2 & Viag_Km > 1, Viag_Durata >0.0166)
+
+write.csv(trips_november_GG, "trips_NOVEMBER_UNIBS_Giuli.csv")
+
+
+## summary statistics by DAY of the WEEK #############
+trips <- rbind(trips_march_GG,
+               trips_november_GG)
+## assign name to month
+trips$month <- as.factor(trips$month)
+trips$month <- gsub(3, "marzo", (trips$month))
+trips$month <- gsub(11, "novembre", (trips$month))
+trips$hour <- hour(trips$D_Data)
+trips$day <- weekdays(as.Date(trips$D_Data))
+
+
+#####---------------------------------------########
+#### table per Natascia x modelling ################
+#### --------------------------------------- #######
+
+trips_GG_natascia_march <- trips %>%
+  filter(month == "marzo") %>%
+  dplyr::select(Id_Term,
+                Id_Viaggi,
+                D_Data,
+                D_Sosta_Dur,
+                Viag_Km,
+                Viag_Durata)
+
+
+trips_GG_natascia_november <- trips %>%
+  filter(month == "novembre") %>%
+  dplyr::select(Id_Term,
+                Id_Viaggi,
+                D_Data,
+                D_Sosta_Dur,
+                Viag_Km,
+                Viag_Durata)
+
+#### --------------------------------------- ###########################################
+#### --------------------------------------- ###########################################
+#### --------------------------------------- ###########################################
+
+
+trips <- trips %>%
+  group_by(month, day) %>%
+  summarise(count = length(Id_Term),
+            total_km = sum(Viag_Km)) 
+
+trips <- as.data.frame(trips)
+categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
+
+p <- ggplot(data = trips,
+            aes(day, total_km, fill = day)) + guides(fill=FALSE) +
+  geom_bar(stat="identity") +
+  facet_wrap( ~ month, scales = "free_y") +
+  guides(fill=FALSE) +
+  scale_x_discrete(limits = categories) +
+  ylim(0, 460) +
+  theme_bw() +
+  theme( strip.text = element_text(size = 15)) +
+  theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+  theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+  theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+  ylab("Km percorsi") +            # Set y-axis label
+  theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+  xlab("") +            # Set y-axis label
+  theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+        axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
+  geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+  ggtitle("Km percorsi per recarsi all'Università (Via Branze 37, Brescia)") + 
+  theme(plot.title = element_text(lineheight=.8, face="bold"))
+p
+
+
+
+````
+
+
+*<br/><br/>*
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 5.** Km percorsi per recarsi all'Università (Via Branze 37, Brescia) per ora della giornata."}
+
+
+#### elaborations from Giancarlo Giuli #####
+
+### summary statistics by HOUR
+trips <- rbind(trips_march_GG,
+               trips_november_GG)
+## assign name to month
+trips$month <- as.factor(trips$month)
+trips$month <- gsub(3, "march", (trips$month))
+trips$month <- gsub(11, "november", (trips$month))
+trips$hour <- hour(trips$D_Data)
+trips$day <- weekdays(as.Date(trips$D_Data))
+
+trips <- trips %>%
+  group_by(month, hour) %>%
+  summarise(count = length(Id_Term),
+            total_km = sum(Viag_Km)) 
+
+
+p <- ggplot(data = trips,
+              aes(hour, total_km, fill = hour)) + guides(fill=FALSE) +
+    geom_bar(stat = "identity") + 
+    facet_wrap( ~ month, scales = "free_y") +
+    guides(fill=FALSE) +
+    ylim(0, 900) +
+    theme_bw() +
+    theme( strip.text = element_text(size = 15)) +
+    theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+    theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+    theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+    ylab("Km percorsi") +            # Set y-axis label
+    theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+          axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+    xlab("") +            # Set y-axis label
+    theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+          axis.text.x  = element_text(angle=0, vjust=1, hjust=0.5, size=13)) +
+   # scale_x_continuous(breaks=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14, 15,16,17,18,19,20,21,22,23)) +
+    scale_x_continuous(breaks=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14, 15,16,17,18,19,20,21,22,23)) +
+    geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+    ggtitle("Km percorsi per recarsi all'Università (Via Branze 37, Brescia)") + 
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+p
+
+
+
+````
+
+
+*<br/><br/>*
+
+
+
+
+````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Figura 6.** Tempi medi di sosta all'Università (Via Branze 37, Brescia) per giorno della settimana."}
+
+
+
+
+## summary statistics by DAY of the WEEK #############
+trips <- rbind(trips_march_GG,
+               trips_november_GG)
+## assign name to month
+trips$month <- as.factor(trips$month)
+trips$month <- gsub(3, "marzo", (trips$month))
+trips$month <- gsub(11, "novembre", (trips$month))
+trips$hour <- hour(trips$D_Data)
+trips$day <- weekdays(as.Date(trips$D_Data))
+
+trips <- trips %>%
+  group_by(month, day) %>%
+  summarise(count = length(Id_Term),
+            total_km = sum(Viag_Km),
+            mean_stop_time = mean(D_Sosta_Dur, na.rm = T)) 
+
+trips <- as.data.frame(trips)
+categories <- c("lunedì", "martedì", "mercoledì", "giovedì", "venerdì" ,"sabato" ,"domenica")
+
+p <- ggplot(data = trips,
+            aes(day, mean_stop_time, fill = day)) + guides(fill=FALSE) +
+  geom_bar(stat="identity") +
+  facet_wrap( ~ month, scales = "free_y") +
+  guides(fill=FALSE) +
+  scale_x_discrete(limits = categories) +
+  ylim(0, 8) +
+  theme_bw() +
+  theme( strip.text = element_text(size = 15)) +
+  theme(axis.text.x=element_text(angle=0,hjust=1,vjust=0.5)) +
+  theme(axis.text.x=element_text(size=11,face="bold", colour = "black")) +
+  theme(axis.title.x = element_blank()) +                  # Remove x-axis label
+  ylab("Tempo sosta medio (h)") +            # Set y-axis label
+  theme(axis.title.y = element_text(face="bold", colour="black", size=14),
+        axis.text.y  = element_text(angle=0, vjust=0.5, size=14)) +
+  xlab("") +            # Set y-axis label
+  theme(axis.title.x = element_text(face="bold", colour="black", size=14),
+        axis.text.x  = element_text(angle=45, vjust=1, size=14)) +
+  geom_text(aes(label = paste(count, sep = "")), size = 5, hjust = 0.5, vjust = -0.5) +
+  ggtitle("Tempi medi di sosta all'Università (Via Branze 37, Brescia)") + 
+  theme(plot.title = element_text(lineheight=.8, face="bold"))
+p
+
+
 ````
 
 *<br/><br/>*
+
 
 ````{r, message = FALSE, echo = FALSE, warning = FALSE, fig.width=9,fig.height=5,  fig.cap ="**Tabella 1.**"}
 
 
 ##############################################################
-####### results from map-matching ############################
+####### get mean speed from instant speeds ###################
 ####### -------------------------- ###########################
 
 ## load EDGE files with all info of the road network over Brescia
-EDGES <- read.csv("D:/ENEA_CAS_WORK/BRESCIA/gdf_edges_BRESCIA_all.csv")[-1]
+EDGES <- read.csv("D:/ENEA_CAS_WORK/BRESCIA/gdf_edges_BRESCIA.csv")[-1]
 EDGES <- as.data.frame(EDGES)
 ## skip "geometry"
 EDGES <- EDGES[, names(EDGES)[which(names(EDGES) != "geometry")]]
@@ -272,19 +699,198 @@ EDGES <- EDGES %>%
 EDGES$ID <- 1:nrow(EDGES)
 
 
-#### load map-matching data for all vehicles who stops at the University of Brecia at least one time in March 2019
-mapmaching_UNIBS_all_march_2019 = dbGetQuery(conn_HAIG, "
-                                    SELECT *
-                                    FROM \"mapmatching_UNIBS_march_2019\"
-                                    ")
-## join EDGES with mapmaching_UNIBS_all_march_2019
-mapmaching_UNIBS_all_march_2019 <- mapmaching_UNIBS_all_march_2019 %>%
-  left_join(EDGES, by = c("u", "v", "length"))
+###############
+### MARCH #####
+###############
 
-## get al data of CARS enteirng the parking lot of the University of Brescia
-parking_unibs <- mapmaching_UNIBS_all_march_2019 %>%
-  filter(u == c("410689924") & 
-           v == c("410689923"))
+#### load map-matching data for all vehicles who stops at the University of Brescia at least one time in March 2019
+routecheck_all_march_2019 = dbGetQuery(conn_HAIG, "
+                                    SELECT routecheck_march_2019.idtrajectory,
+                                         routecheck_march_2019.speed,                                                                 routecheck_march_2019.idterm
+                                    FROM routecheck_march_2019
+                                    ")
+
+
+routecheck_all_march_2019 <- routecheck_all_march_2019 %>%
+  group_by(idterm, idtrajectory) %>%
+  summarise(mean_speed = mean(speed, na.rm = T))
+
+routecheck_all_march_2019 <-as.data.frame(routecheck_all_march_2019)
+routecheck_all_march_2019$idterm <- as.numeric(routecheck_all_march_2019$idterm)
+
+## join routecheck with trips
+trips_natascia_march <- trips_natascia_march %>%
+  left_join(routecheck_all_march_2019[ , c("idterm", "idtrajectory", "mean_speed")], by = c("idterm", "idtrajectory"))
+
+trips_natascia_march <- trips_natascia_march %>%
+  mutate(timedate_d = ymd_hms(timedate_d)) %>%
+  select(idterm,
+         idtrajectory,
+         timedate_d,
+         breaktime_hours,
+         tripdistance_km,
+         mean_speed)
+trips_natascia_march$breaktime_hours <- round(trips_natascia_march$breaktime_hours, digits = 2)
+trips_natascia_march$tripdistance_km <- round(trips_natascia_march$tripdistance_km, digits = 2)
+trips_natascia_march$mean_speed <- round(trips_natascia_march$mean_speed, digits = 2)
+
+names(trips_natascia_march) <- c("id_vehicle", "id_trip", "arrival_time", "parking_time_hours", "trip_distance_km", "mean_speed_km_h")
+
+
+##################
+### NOVEMBER #####
+##################
+
+#### load map-matching data for all vehicles who stops at the University of Brescia at least one time in March 2019
+routecheck_all_november_2019 = dbGetQuery(conn_HAIG, "
+                                    SELECT routecheck_november_2019.idtrajectory,
+                                         routecheck_november_2019.speed,                                                              routecheck_november_2019.idterm
+                                    FROM routecheck_november_2019
+                                    ")
+
+
+routecheck_all_november_2019 <- routecheck_all_november_2019 %>%
+  group_by(idterm, idtrajectory) %>%
+  summarise(mean_speed = mean(speed, na.rm = T))
+
+routecheck_all_november_2019 <-as.data.frame(routecheck_all_november_2019)
+routecheck_all_november_2019$idterm <- as.numeric(routecheck_all_november_2019$idterm)
+
+## join routecheck with trips
+trips_natascia_november <- trips_natascia_november %>%
+  left_join(routecheck_all_november_2019[ , c("idterm", "idtrajectory", "mean_speed")], by = c("idterm", "idtrajectory"))
+
+trips_natascia_november <- trips_natascia_november %>%
+  mutate(timedate_d = ymd_hms(timedate_d)) %>%
+  select(idterm,
+         idtrajectory,
+         timedate_d,
+         breaktime_hours,
+         tripdistance_km,
+         mean_speed)
+trips_natascia_november$breaktime_hours <- round(trips_natascia_november$breaktime_hours, digits = 2)
+trips_natascia_november$tripdistance_km <- round(trips_natascia_november$tripdistance_km, digits = 2)
+trips_natascia_november$mean_speed <- round(trips_natascia_november$mean_speed, digits = 2)
+
+names(trips_natascia_november) <- c("id_vehicle", "id_trip", "arrival_time", "parking_time_hours", "trip_distance_km", "mean_speed_km_h")
+
+
+
+trips_natascia <- rbind(trips_natascia_march,
+                        trips_natascia_november)
+write.csv(trips_natascia, "trips_UNIBS_BRESCIA_MoSoRe_2019.csv")
+
+
+#### ALL TRIPS ######################################################
+##### -------------------------------- ##############################
+########################################•#############################
+
+all_routecheck_2019 <- rbind(routecheck_all_march_2019,
+                            routecheck_all_november_2019)
+## join routecheck with trips
+all_trips_natascia <- all_trips_natascia %>%
+  left_join(all_routecheck_2019[ , c("idterm", "idtrajectory", "mean_speed")], by = c("idterm", "idtrajectory"))
+
+all_trips_natascia <- all_trips_natascia %>%
+  mutate(timedate_d = ymd_hms(timedate_d)) %>%
+  select(idterm,
+         idtrajectory,
+         timedate_d,
+         breaktime_hours,
+         tripdistance_km,
+         mean_speed) %>%
+  filter(mean_speed > 13, breaktime_hours > 0.016666, tripdistance_km > 0.7)
+all_trips_natascia$breaktime_hours <- round(all_trips_natascia$breaktime_hours, digits = 2)
+all_trips_natascia$tripdistance_km <- round(all_trips_natascia$tripdistance_km, digits = 2)
+all_trips_natascia$mean_speed <- round(all_trips_natascia$mean_speed, digits = 2)
+
+all_trips_natascia <- all_trips_natascia[complete.cases(all_trips_natascia), ]
+
+names(all_trips_natascia) <- c("id_vehicle", "id_trip", "arrival_time", "parking_time_hours", "trip_distance_km", "mean_speed_km_h")
+write.csv(all_trips_natascia, "all_trips_BRESCIA_MoSoRe_2019.csv")
+
+
+########################################################
+########################################################
+### from Giancarlo Giuli data ##########################
+### ------------------------------######################
+
+
+###############
+### MARCH #####
+###############
+
+## rename columns
+colnames(trips_GG_natascia_march)[colnames(trips_GG_natascia_march) == 'Id_Term'] <- 'idterm'
+colnames(trips_GG_natascia_march)[colnames(trips_GG_natascia_march) == 'Id_Viaggi'] <- 'idtrajectory'
+
+### compute mean speed
+
+trips_GG_natascia_march$mean_speed <- trips_GG_natascia_march$Viag_Km / trips_GG_natascia_march$Viag_Durata
+
+trips_GG_natascia_march <- trips_GG_natascia_march %>%
+  mutate(D_Data = ymd_hms(D_Data)) %>%
+  select(idterm,
+         idtrajectory,
+         D_Data,
+         D_Sosta_Dur,
+         Viag_Km,
+         mean_speed)
+
+trips_GG_natascia_march$D_Sosta_Dur <- round(trips_GG_natascia_march$D_Sosta_Dur, digits = 2)
+trips_GG_natascia_march$Viag_Km <- round(trips_GG_natascia_march$Viag_Km, digits = 2)
+trips_GG_natascia_march$mean_speed <- round(trips_GG_natascia_march$mean_speed, digits = 2)
+
+names(trips_GG_natascia_march) <- c("id_vehicle", "id_trip", "arrival_time", "parking_time_hours", "trip_distance_km", "mean_speed_km_h")
+
+
+##################
+### NOVEMBER #####
+##################
+
+
+## rename columns
+colnames(trips_GG_natascia_november)[colnames(trips_GG_natascia_november) == 'Id_Term'] <- 'idterm'
+colnames(trips_GG_natascia_november)[colnames(trips_GG_natascia_november) == 'Id_Viaggi'] <- 'idtrajectory'
+
+### compute mean speed
+
+trips_GG_natascia_november$mean_speed <- trips_GG_natascia_november$Viag_Km / trips_GG_natascia_november$Viag_Durata
+
+trips_GG_natascia_november <- trips_GG_natascia_november %>%
+  mutate(D_Data = ymd_hms(D_Data)) %>%
+  select(idterm,
+         idtrajectory,
+         D_Data,
+         D_Sosta_Dur,
+         Viag_Km,
+         mean_speed)
+
+trips_GG_natascia_november$D_Sosta_Dur <- round(trips_GG_natascia_november$D_Sosta_Dur, digits = 2)
+trips_GG_natascia_november$Viag_Km <- round(trips_GG_natascia_november$Viag_Km, digits = 2)
+trips_GG_natascia_november$mean_speed <- round(trips_GG_natascia_november$mean_speed, digits = 2)
+
+names(trips_GG_natascia_november) <- c("id_vehicle", "id_trip", "arrival_time", "parking_time_hours", "trip_distance_km", "mean_speed_km_h")
+
+
+trips_GG_natascia <- rbind(trips_GG_natascia_march,
+                        trips_GG_natascia_november)
+trips_GG_natascia <- trips_GG_natascia %>%
+  filter(mean_speed_km_h > 13)
+
+write.csv(trips_GG_natascia, "trips_UNIBS_BRESCIA_MoSoRe_2019_GG.csv")
+
+
+
+# ## join EDGES with mapmaching_UNIBS_all_march_2019
+# mapmaching_UNIBS_all_march_2019 <- mapmaching_UNIBS_all_march_2019 %>%
+#   left_join(EDGES, by = c("u", "v", "length"))
+# 
+# 
+# ## get al data of CARS entering the parking lot of the University of Brescia
+# parking_unibs <- mapmaching_UNIBS_all_march_2019 %>%
+#   filter(u == c("410689924") & 
+#            v == c("410689923"))
 
 
 ````
