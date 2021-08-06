@@ -27,6 +27,8 @@ from datetime import date
 from datetime import datetime
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import *
+from sqlalchemy import exc
+from sqlalchemy.pool import NullPool
 import sqlalchemy as sal
 import geopy.distance
 import warnings
@@ -71,7 +73,7 @@ os.getcwd()
 ########################################################################################
 
 # connect to new DB to be populated with Viasat data after route-check
-conn_HAIG = db_connect.connect_HAIG_Viasat_BS()
+conn_HAIG = db_connect.connect_HAIG_BRESCIA()
 cur_HAIG = conn_HAIG.cursor()
 
 # erase existing table
@@ -85,37 +87,79 @@ def wkb_hexer(line):
 
 
 # Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_BS')
+engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_BRESCIA', poolclass=NullPool)
+
+'''
+## import OSM network into the DB 'HAIG_BRESCIA'
+###  to a DB and populate the DB  ###
+connection = engine.connect()
+gdf_edges_ALL['geom'] = gdf_edges_ALL['geometry'].apply(wkb_hexer)
+gdf_edges_ALL.drop('geometry', 1, inplace=True)
+gdf_edges_ALL.to_sql("edges", con=connection, schema="net",
+                   if_exists='append')
+
+gdf_nodes_ALL['geom'] = gdf_nodes_ALL['geometry'].apply(wkb_hexer)
+gdf_nodes_ALL.drop('geometry', 1, inplace=True)
+gdf_nodes_ALL.to_sql("nodes", con=connection, schema="net",
+                   if_exists='append')
+
+##### "edges": convert "geometry" field as LINESTRING
+with engine.connect() as conn, conn.begin():
+    print(conn)
+    sql = """ALTER TABLE net.edges
+    ALTER COLUMN geom TYPE Geometry(LINESTRING, 4326)
+     USING ST_SetSRID(geom::Geometry, 4326)"""
+    conn.execute(sql)
 
 
-# ### load grafo (all possible streets)
-# file_graphml = 'Brescia_50km__Italy.graphml'
-# grafo_ALL = ox.load_graphml(file_graphml)
-# ## ox.plot_graph(grafo_ALL)
-# gdf_nodes_ALL, gdf_edges_ALL = ox.graph_to_gdfs(grafo_ALL)
-# gdf_edges_ALL.to_csv('gdf_edges_BRESCIA.csv')
+##### "nodes": convert "geometry" field as POINTS
+with engine.connect() as conn, conn.begin():
+    print(conn)
+    sql = """ALTER TABLE net.nodes
+    ALTER COLUMN geom TYPE Geometry(POINT, 4326)
+    USING ST_SetSRID(geom::Geometry, 4326)"""
+    conn.execute(sql)
 
-# ## import OSM network into the DB 'HAIG_Viasat_BS'
-# ###  to a DB and populate the DB  ###
-# connection = engine.connect()
-# gdf_edges_ALL['geom'] = gdf_edges_ALL['geometry'].apply(wkb_hexer)
-# gdf_edges_ALL.drop('geometry', 1, inplace=True)
-# gdf_edges_ALL.to_sql("OSM_edges_all", con=connection, schema="public",
-#                    if_exists='append')
-#
-# # create index on the column (u,v) togethers in the table 'gdf_edges_ALL' ###
-# # Multicolumn Indexes ####
-#
-# cur_HAIG.execute("""
-# CREATE INDEX edges_all_UV_idx ON public."OSM_edges_all"(u,v);
-# """)
-# conn_HAIG.commit()
-#
-# conn_HAIG.close()
-# cur_HAIG.close()
+## create index on the column (u,v) togethers in the table 'edges' ###
+## Multicolumn Indexes ####
+
+cur_HAIG.execute("""
+CREATE INDEX edges_UV_idx ON net.edges(u,v);
+""")
+conn_HAIG.commit()
+
+conn_HAIG.close()
+cur_HAIG.close()
+
+'''
+
+"""
+## get all ID terminal of Viasat data  (from routecheck)
+all_VIASAT_IDterminals = pd.read_sql_query(
+    ''' SELECT "idterm"
+        FROM public.routecheck''', conn_HAIG)
+## make a list of all IDterminals (GPS ID of Viasata data) each ID terminal (track) represent a distinct vehicle
+all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
+## all_ID_TRACKS = [int(i) for i in all_ID_TRACKS]
+## save 'all_ID_TRACKS' as list
+with open("D:/ENEA_CAS_WORK/BRESCIA/all_ID_TRACKS_2019.txt", "w") as file:
+     file.write(str(all_ID_TRACKS))
 
 
+### get all terminals corresponding to 'fleet' (670, from routecheck_2019)
+viasat_fleet = pd.read_sql_query('''
+              SELECT idterm, vehtype
+              FROM public.routecheck
+              WHERE vehtype = '2' ''', conn_HAIG)
+## make an unique list
+idterms_fleet = list(viasat_fleet.idterm.unique())
+## save 'all_ID_TRACKS' as list
+with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_fleet.txt", "w") as file:
+     file.write(str(idterms_fleet))
+"""
 
+
+"""
 ## read all idterms that stop at the Universita' di Brescia (only of CARS)
 idterm_UNIBS = pd.read_csv('idterm_UNIBS.csv')
 ## load all trips going to the University of Brescia (Dipartmento di Ingegneria, Via Brianze, Brescia)
@@ -125,6 +169,21 @@ trips_UNIBS_november = pd.read_csv('trips_NOVEMBER_UNIBS.csv')
 idterm_UNIBS = list(idterm_UNIBS.idterm.unique())
 trips_UNIBS_march = list(trips_UNIBS_march.idtrajectory.unique())
 trips_UNIBS_november = list(trips_UNIBS_november.idtrajectory.unique())
+"""
+
+
+
+## reload 'all_ID_TRACKS' as list
+with open("D:/ENEA_CAS_WORK/BRESCIA/all_ID_TRACKS_2019.txt", "r") as file:
+    all_ID_TRACKS = eval(file.readline())
+# with open("D:/ENEA_CAS_WORK/SENTINEL/viasat_data/all_ID_TRACKS_2019_new.txt", "r") as file:
+#     all_ID_TRACKS = eval(file.readline())
+
+
+## reload 'idterms_fleet' as list
+with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_fleet.txt", "r") as file:
+    idterms_fleet = eval(file.readline())
+
 
 
 # idtrajectory = 68872355    # March
@@ -144,8 +203,9 @@ def func(arg):
     last_track_idx, idtrajectory = arg
     idtrajectory = str(idtrajectory)
     print("idtrajectory:", idtrajectory)
-    viasat = pd.read_sql_query('''
-                SELECT * FROM public.routecheck_november_2019 
+    viasat = pd.read_sql_query(''' 
+                SELECT * FROM public.routecheck
+                /*SELECT * FROM public.routecheck_november_2019*/
                 WHERE "idtrajectory" = '%s' ''' % idtrajectory, conn_HAIG)
     viasat = viasat.sort_values('timedate')
     viasat.reset_index(drop=True, inplace=True)
@@ -806,7 +866,7 @@ def func(arg):
                             ## final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
                             ## final_map_matching_table_GV.drop('geometry', 1, inplace=True)
 
-                            final_map_matching_table_GV.to_sql("mapmatching_ONLY_UNIBS_november_2019", con=connection, schema="public",
+                            final_map_matching_table_GV.to_sql("mapmatching", con=connection, schema="public",
                                              if_exists='append')
                             connection.close()
 
@@ -825,7 +885,7 @@ if __name__ == '__main__':
     # pool = mp.Pool(processes=mp.cpu_count()) ## use all available processors
     pool = mp.Pool(processes=55)     ## use 30 processors
     print("++++++++++++++++ POOL +++++++++++++++++", pool)
-    results = pool.map(func, [(last_track_idx, idtrajectory) for last_track_idx, idtrajectory in enumerate(trips_UNIBS_november)])
+    results = pool.map(func, [(last_track_idx, idtrajectory) for last_track_idx, idtrajectory in enumerate(all_ID_TRACKS)])
     pool.close()
     pool.close()
     pool.join()
