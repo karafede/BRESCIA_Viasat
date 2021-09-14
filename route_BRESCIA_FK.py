@@ -122,12 +122,12 @@ with open("idterms_2019.txt", "w") as file:
 """
 
 # ## reload all 'idterms' as list
-# with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_2019.txt", "r") as file:
-#   idterms = eval(file.readline())
-
-
-with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_2019_new.txt", "r") as file:
+with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_2019.txt", "r") as file:
    idterms = eval(file.readline())
+
+
+# with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_2019_new.txt", "r") as file:
+#   idterms = eval(file.readline())
 
 
 def func(arg):
@@ -166,7 +166,7 @@ def func(arg):
             if len(data) > 1:
                 ## find outliers
                 q = data["progressive"].quantile(0.99)
-                data = data[data["progressive"] < q]
+                data = data[data["progressive"] <= q]
                 if len(data) > 1:
                     geometry = [Point(xy) for xy in zip(data.longitude, data.latitude)]
                     df = GeoDataFrame(data, geometry=geometry)
