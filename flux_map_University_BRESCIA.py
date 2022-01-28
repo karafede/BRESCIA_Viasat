@@ -82,8 +82,8 @@ viasat_data_march_2019 = pd.read_sql_query('''
                               FROM "mapmatching_UNIBS_march_2019"
                               LEFT JOIN dataraw 
                                           ON "mapmatching_UNIBS_march_2019".idtrace = dataraw.id  
-                                          /*WHERE date(mapmatching_2019.timedate) = '2019-02-25' AND*/
-                                           WHERE EXTRACT(MONTH FROM "mapmatching_UNIBS_march_2019".timedate) = '03'
+                                          WHERE date("mapmatching_UNIBS_march_2019".timedate) = '2019-03-06' 
+                                           /*WHERE EXTRACT(MONTH FROM "mapmatching_UNIBS_march_2019".timedate) = '03'*/
                                           /*WHERE dataraw.vehtype::bigint = 1*/
                                           ''', conn_HAIG)
 
@@ -138,10 +138,10 @@ viasat_data_november_2019_only_UNIBS = pd.read_sql_query('''
                                                   ''', conn_HAIG)
 
 ### get counts for all edges ########
-# all_data = viasat_data_march_2019[['u','v']]
+all_data = viasat_data_march_2019[['u','v']]
 # all_data = viasat_data_november_2019[['u','v']]
 # all_data = viasat_data_march_2019_only_UNIBS[['u','v']]
-all_data = viasat_data_november_2019_only_UNIBS[['u','v']]
+# all_data = viasat_data_november_2019_only_UNIBS[['u','v']]
 all_counts_uv = all_data.groupby(all_data.columns.tolist(), sort=False).size().reset_index().rename(columns={0:'counts'})
 
 ########################################################
@@ -156,6 +156,8 @@ all_counts_uv.drop_duplicates(['u', 'v'], inplace=True)
 
 ## rescale all data by an arbitrary number
 all_counts_uv["scales"] = (all_counts_uv.counts/max(all_counts_uv.counts)) * 7
+## Normalize to 1 and get loads
+all_counts_uv["load(%)"] = round(all_counts_uv["counts"]/max(all_counts_uv["counts"]),4)*100
 
 
 ####################################################################################
@@ -167,7 +169,7 @@ my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
 
 
 folium.GeoJson(
-all_counts_uv[['u','v', 'counts', 'scales', 'geometry']].to_json(),
+all_counts_uv[['u','v', 'counts', 'scales', 'load(%)', 'geometry']].to_json(),
     style_function=lambda x: {
         'fillColor': 'blue',
         'color': 'blue',
@@ -180,12 +182,12 @@ highlight_function=lambda x: {'weight':3,
     },
     # fields to show
     tooltip=folium.features.GeoJsonTooltip(
-        fields=['u', 'v', 'counts']),
+        fields=['u', 'v', 'load(%)']),
     ).add_to(my_map)
 
 path = 'D:/ENEA_CAS_WORK/BRESCIA/viasat_data/'
-my_map.save(path + "November_trip_CARS_only_UNIBS.html")
-# my_map.save(path + "March_trip_CARS_only_UNIBS.html")
+# my_map.save(path + "November_trip_CARS_only_UNIBS.html")
+my_map.save(path + "06_March_trip_all_vehicles_Brescia.html")
 # my_map.save(path + "March_CARS_traffic_UNIBS.html")
 # my_map.save(path + "November_CARS_traffic_UNIBS.html")
 
