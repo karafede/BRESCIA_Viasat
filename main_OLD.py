@@ -5,8 +5,6 @@ from load_DB import upload_DB
 from load_DB import idterm_vehtype_portata
 import glob
 import db_connect
-import sqlalchemy as sal
-
 
 os.chdir('D:/ViaSat/Brescia/obu')
 cwd = os.getcwd()
@@ -15,34 +13,13 @@ obu_CSV = "VST_ENEA_BS_DATISTATICI_20201118_new.csv"
 
 ### upload Viasat data for into the DB (only dataraw, NOT OBU data!!!)
 extension = 'csv'
-os.chdir('D:/ViaSat/Brescia/marzo_2019')
-viasat_filenames_march_2019 = glob.glob('*.{}'.format(extension))
-
-os.chdir('D:/ViaSat/Brescia/novembre_2019')
-viasat_filenames_november_2019 = glob.glob('*.{}'.format(extension))
-
-# join two lists together
-# viasat_filenames =  viasat_filenames_march_2019 + viasat_filenames_november_2019
+os.chdir('D:/ViaSat/Brescia')
+viasat_filenames = glob.glob('*.{}'.format(extension))
 
 # connect to new DB to be populated with Viasat data
-conn_HAIG = db_connect.connect_HAIG_BRESCIA()
+conn_HAIG = db_connect.connect_HAIG_Viasat_BS()
 cur_HAIG = conn_HAIG.cursor()
 
-
-## create extension postgis on the database HAIG_CATANIA  (only one time)
-
-'''
-
-cur_HAIG.execute("""
-    CREATE EXTENSION postgis
-""")
-
-cur_HAIG.execute("""
-CREATE EXTENSION postgis_topology
-""")
-conn_HAIG.commit()
-
-'''
 
 #########################################################################################
 ### upload OBU data into the DB. Create table with idterm, vehicle type and put into a DB
@@ -50,11 +27,8 @@ conn_HAIG.commit()
 obu(obu_CSV)
 
 ### upload viasat data into the DB  # long time run...
-os.chdir('D:/ViaSat/Brescia/marzo_2019')
-upload_DB(viasat_filenames_march_2019)
+upload_DB(viasat_filenames)
 
-os.chdir('D:/ViaSat/Brescia/novembre_2019')
-upload_DB(viasat_filenames_november_2019)
 
 ###########################################################
 ### ADD a SEQUENTIAL ID to the dataraw table ##############
@@ -150,74 +124,130 @@ os.chdir('D:/ENEA_CAS_WORK/BRESCIA')
 
 
 
-## add indices ######
+### change type of "idterm" from text to bigint
+cur_HAIG.execute("""
+ALTER TABLE public.routecheck_march_2019 ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
+""")
+conn_HAIG.commit()
+
 
 ### change type of "idterm" from text to bigint
 cur_HAIG.execute("""
-ALTER TABLE public.routecheck ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
-""")
-conn_HAIG.commit()
-
-cur_HAIG.execute("""
-CREATE index routecheck_id_idx on public.routecheck("id");
-""")
-conn_HAIG.commit()
-
-
-cur_HAIG.execute("""
-CREATE index routecheck_idterm_idx on public.routecheck("idterm");
+ALTER TABLE public.routecheck_november_2019 ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
 """)
 conn_HAIG.commit()
 
 
 
 cur_HAIG.execute("""
-CREATE index routecheck_TRIP_ID_idx on public.routecheck("TRIP_ID");
+CREATE index routecheck_march_2019_id_idx on public.routecheck_march_2019("id");
 """)
 conn_HAIG.commit()
 
 
 cur_HAIG.execute("""
-CREATE index routecheck_idtrajectory_ID_idx on public.routecheck("idtrajectory");
-""")
-conn_HAIG.commit()
-
-
-
-
-cur_HAIG.execute("""
-CREATE index routecheck_timedate_idx on public.routecheck("timedate");
+CREATE index routecheck_november_2019_id_idx on public.routecheck_november_2019("id");
 """)
 conn_HAIG.commit()
 
 
 cur_HAIG.execute("""
-CREATE index routecheck_grade_idx on public.routecheck("grade");
+CREATE index routecheck_march_2019_idterm_idx on public.routecheck_march_2019("idterm");
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_november_2019_idterm_idx on public.routecheck_november_2019("idterm");
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_march_2019_TRIP_ID_idx on public.routecheck_march_2019("TRIP_ID");
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_november_2019_TRIP_ID_idx on public.routecheck_november_2019("TRIP_ID");
 """)
 conn_HAIG.commit()
 
 
 
 cur_HAIG.execute("""
-CREATE index routecheck_anomaly_idx on public.routecheck("anomaly");
+CREATE index routecheck_march_2019_timedate_idx on public.routecheck_march_2019("timedate");
 """)
 conn_HAIG.commit()
 
 
 cur_HAIG.execute("""
-CREATE index routecheck_speed_idx on public.routecheck("speed");
+CREATE index routecheck_november_2019_timedate_idx on public.routecheck_november_2019("timedate");
+""")
+conn_HAIG.commit()
+
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_march_2019_grade_idx on public.routecheck_march_2019("grade");
 """)
 conn_HAIG.commit()
 
 
 cur_HAIG.execute("""
-CREATE index routecheck_lat_idx on public.routecheck(latitude);
+CREATE index routecheck_november_2019_grade_idx on public.routecheck_november_2019("grade");
+""")
+conn_HAIG.commit()
+
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_march_2019_anomaly_idx on public.routecheck_march_2019("anomaly");
 """)
 conn_HAIG.commit()
 
 
 cur_HAIG.execute("""
-CREATE index routecheck_lon_idx on public.routecheck(longitude);
+CREATE index routecheck_movember_2019_anomaly_idx on public.routecheck_november_2019("anomaly");
+""")
+conn_HAIG.commit()
+
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_march_2019_speed_idx on public.routecheck_march_2019("speed");
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_november_2019_speed_idx on public.routecheck_november_2019("speed");
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_march_2019_lat_idx on public.routecheck_march_2019(latitude);
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_november_2019_lat_idx on public.routecheck_november_2019(latitude);
+""")
+conn_HAIG.commit()
+
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_march_2019_lon_idx on public.routecheck_march_2019(longitude);
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+CREATE index routecheck_november_2019_lon_idx on public.routecheck_november_2019(longitude);
 """)
 conn_HAIG.commit()
 
@@ -226,100 +256,71 @@ conn_HAIG.commit()
 ##### create table route ################################################################
 
 ## multiprocess....
-# exec(open("route_FK.py").read())
-
-
-# Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_BRESCIA')
-
-
-#### setup multiprocessing.......
-
-
-
-# long time run...
-## create a consecutive ID for each row
-cur_HAIG.execute("""
-alter table "route" add id serial PRIMARY KEY
-     """)
-conn_HAIG.commit()
-
-
-## create an ndex on the "id" field
-cur_HAIG.execute("""
-CREATE index route_id_idx on public.route("id");
-""")
-conn_HAIG.commit()
-
+exec(open("route_FK.py").read())
 
 
 ### change type of "idterm" from text to bigint
 cur_HAIG.execute("""
-ALTER TABLE public.route ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
+ALTER TABLE public.route_november_2019 ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
+""")
+conn_HAIG.commit()
+
+
+cur_HAIG.execute("""
+ALTER TABLE public.route_march_2019 ALTER COLUMN "idterm" TYPE bigint USING "idterm"::bigint
+""")
+conn_HAIG.commit()
+
+### create index for 'idterm'
+cur_HAIG.execute("""
+CREATE index route_november_2019_idterm_idx on public.route_november_2019(idterm);
 """)
 conn_HAIG.commit()
 
 
 ### create index for 'idterm'
 cur_HAIG.execute("""
-CREATE index route_idterm_idx on public.route(idterm);
+CREATE index route_march_2019_idterm_idx on public.route_march_2019(idterm);
 """)
 conn_HAIG.commit()
 
 
-### create index for 'idtrajectory'
+#################################################
+##### map-matching ##############################
+
+## multiprocess....
+exec(open("map_matching_FK_BRESCIA_MULTIPROCESS.py.py").read())
+
+
+## create index on the column (u,v) togethers in the table 'mapmatching_2017' ###
 cur_HAIG.execute("""
-CREATE index route_idtrajectory_idx on public.route(idtrajectory);
+CREATE INDEX UV_november_only_idx_2019 ON public."mapmatching_ONLY_UNIBS_november_2019"(u,v);
 """)
 conn_HAIG.commit()
 
 
-### create index for 'tripdistance_m'
+## create index on the "TRIP_ID" column
 cur_HAIG.execute("""
-CREATE index route_tripdistance_idx on public.route(tripdistance_m);
+CREATE index trip_november_only_2019_idx on public."mapmatching_ONLY_UNIBS_november_2019"("TRIP_ID");
 """)
 conn_HAIG.commit()
 
 
-### create index for 'timedate_o'
+## create index on the "TRIP_ID" column
 cur_HAIG.execute("""
-CREATE index route_timedate_idx on public.route(timedate_o);
+CREATE index idtrajectory_november_only_2019_idx on public."mapmatching_ONLY_UNIBS_november_2019"("idtrajectory");
 """)
 conn_HAIG.commit()
 
 
-### create index for 'breaktime_s'
+## create index on the "idtrace" column
 cur_HAIG.execute("""
-CREATE index route_breaktime_idx on public.route(breaktime_s);
+CREATE index idrace_november_only_2019_idx on public."mapmatching_ONLY_UNIBS_november_2019"("idtrace");
 """)
 conn_HAIG.commit()
 
 
-### create index for 'triptime_s'
 cur_HAIG.execute("""
-CREATE index route_triptime_s_idx on public.route(triptime_s);
+CREATE index timedate_november_only_2019_idx on public."mapmatching_ONLY_UNIBS_november_2019"(timedate);
 """)
 conn_HAIG.commit()
-
-
-
-### create index for 'deviation_pos_m'
-cur_HAIG.execute("""
-CREATE index route_deviation_pos_idx on public.route(deviation_pos_m);
-""")
-conn_HAIG.commit()
-
-
-##### convert "geometry" field on LINESTRING
-
-## Convert the `'geom'` column back to Geometry datatype, from text
-with engine.connect() as conn, conn.begin():
-    print(conn)
-    sql = """ALTER TABLE public."route"
-                                  ALTER COLUMN geom TYPE Geometry(LINESTRING, 4326)
-                                    USING ST_SetSRID(geom::Geometry, 4326)"""
-    conn.execute(sql)
-
-
-
-

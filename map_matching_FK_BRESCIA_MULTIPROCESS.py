@@ -27,6 +27,7 @@ from datetime import date
 from datetime import datetime
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import *
+from sqlalchemy.pool import NullPool
 import sqlalchemy as sal
 import geopy.distance
 import warnings
@@ -76,7 +77,8 @@ sum(AAA.length)
 ########################################################################################
 
 # connect to new DB to be populated with Viasat data after route-check
-conn_HAIG = db_connect.connect_HAIG_Viasat_BS()
+# conn_HAIG = db_connect.connect_HAIG_Viasat_BS()
+conn_HAIG = db_connect.connect_HAIG_BRESCIA()
 cur_HAIG = conn_HAIG.cursor()
 
 # erase existing table
@@ -91,7 +93,8 @@ def wkb_hexer(line):
 
 # Create an SQL connection engine to the output DB
 # engine = sal.create_engine('postgresql://postgres:superuser@192.168.132.18:5432/HAIG_Viasat_BS')
-engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_BS')
+# engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_BS')
+engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_BRESCIA', poolclass=NullPool)
 
 
 # ## import OSM network into the DB 'HAIG_Viasat_BS'
@@ -122,32 +125,33 @@ engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_V
 # ## get all ID terminal of Viasat data  (25443, from routecheck_2019)
 # all_VIASAT_IDterminals = pd.read_sql_query(
 #     ''' SELECT "idterm"
-#         FROM public.routecheck_2019''', conn_HAIG)
+#         FROM public.routecheck''', conn_HAIG)
 # ## make a list of all IDterminals (GPS ID of Viasata data) each ID terminal (track) represent a distinct vehicle
 # all_ID_TRACKS = list(all_VIASAT_IDterminals.idterm.unique())
 # ## all_ID_TRACKS = [int(i) for i in all_ID_TRACKS]
 # ## save 'all_ID_TRACKS' as list
 # with open("all_ID_TRACKS_2019.txt", "w") as file:
-#     file.write(str(all_ID_TRACKS))
-
+#      file.write(str(all_ID_TRACKS))
 
 ## reload 'all_ID_TRACKS' as list
-# with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_ID_TRACKS_2019.txt", "r") as file:
-#     all_ID_TRACKS = eval(file.readline())
-# with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/all_ID_TRACKS_2019_new.txt", "r") as file:
+with open("D:/ENEA_CAS_WORK/BRESCIA/all_ID_TRACKS_2019.txt", "r") as file:
+     all_ID_TRACKS = eval(file.readline())
+## to use when you restart the mapmatching....
+# with open("D:/ENEA_CAS_WORK/BRESCIA/all_ID_TRACKS_2019_new.txt", "r") as file:
 #     all_ID_TRACKS = eval(file.readline())
 
+
 ## read all idterms that stop at the Universita' di Brescia (only of CARS)
-idterm_UNIBS = pd.read_csv('idterm_UNIBS.csv')
+# idterm_UNIBS = pd.read_csv('idterm_UNIBS.csv')
 ## make a list of unique idterms
-idterm_UNIBS = list(idterm_UNIBS.idterm.unique())
+# idterm_UNIBS = list(idterm_UNIBS.idterm.unique())
 
 
 
 # ### get all terminals corresponding to 'fleet' (670, from routecheck_2019)
 # viasat_fleet = pd.read_sql_query('''
 #               SELECT idterm, vehtype
-#               FROM public.routecheck_2019
+#               FROM public.routecheck
 #               WHERE vehtype = '2' ''', conn_HAIG)
 # # make an unique list
 # idterms_fleet = list(viasat_fleet.idterm.unique())
@@ -157,8 +161,8 @@ idterm_UNIBS = list(idterm_UNIBS.idterm.unique())
 
 
 ## reload 'idterms_fleet' as list
-# with open("D:/ENEA_CAS_WORK/Catania_RAFAEL/viasat_data/idterms_fleet.txt", "r") as file:
-#     idterms_fleet = eval(file.readline())
+with open("D:/ENEA_CAS_WORK/BRESCIA/idterms_fleet.txt", "r") as file:
+     idterms_fleet = eval(file.readline())
 
 
 # track_ID = 5208638
@@ -179,15 +183,16 @@ def func(arg):
     track_ID = str(track_ID)
     print("idterm:", track_ID)
     viasat_data = pd.read_sql_query('''
-                SELECT * FROM public.routecheck_november_2019 
+                SELECT * FROM public.routecheck 
+                 /*WHERE date(routecheck.timedate) = '2019-10-09' AND */    
                 WHERE "idterm" = '%s' ''' % track_ID, conn_HAIG)
     ### FILTERING #############################################
     # viasat_data = viasat_data[viasat_data.anomaly != "IQc345d"]
-    # viasat_data = viasat_data[viasat_data.anomaly != "EQc3456"]
-    # viasat_data = viasat_data[viasat_data.anomaly != "EQc3T5d"]
-    # if int(track_ID) not in idterms_fleet:
-    #     # print("+++++++ vehtype = car ++++++++++++++++")
-    #     viasat_data = viasat_data[viasat_data.anomaly != "IQ2C4V6"]
+    viasat_data = viasat_data[viasat_data.anomaly != "EQc3456"]
+    viasat_data = viasat_data[viasat_data.anomaly != "EQc3T5d"]
+    if int(track_ID) not in idterms_fleet:
+        # print("+++++++ vehtype = car ++++++++++++++++")
+        viasat_data = viasat_data[viasat_data.anomaly != "IQ2C4V6"]
     # list all TRIPS for a each idterm
     all_TRIPS = list(viasat_data.TRIP_ID.unique())
     for idx_trip, trip in enumerate(all_TRIPS):
@@ -236,13 +241,12 @@ def func(arg):
             viasat_extent = gpd.GeoDataFrame(viasat_extent, geometry = 'geometry')
             # viasat_extent.plot()
 
-            # ## get graph only within the extension of the rectangular polygon
-            # ## filter some features from the OSM graph
+            # # get graph only within the extension of the rectangular polygon
+            # # filter some features from the OSM graph
             # filter = (
             #     '["highway"!~"living_street|abandoned|steps|construction|service|pedestrian|'
             #     'bus_guideway|bridleway|corridor|escape|rest_area|track|sidewalk|proposed|path|footway"]')
             # grafo = ox.graph_from_polygon(viasat_extent.geometry[0], custom_filter=filter)
-            # ## ox.plot_graph(grafo)
             #
             # ## make a geo-dataframe from the grapho
             # gdf_nodes, gdf_edges = ox.graph_to_gdfs(grafo)
@@ -365,10 +369,50 @@ def func(arg):
                     ## join two dictionaries
                     nodes_dict = {**u_dict, **v_dict}
 
+                    # define distance between GPS track (viasat measurements) and node
+                    # def great_circle_track_node(u):
+                    #     """
+                    #     Calculate the great circle distance between two points
+                    #     on the earth (specified in decimal degrees)
+                    #     """
+                    #     # u_track = u_dict.get(u)[0][2]
+                    #     u_track = nodes_dict.get(u)[0][2]
+                    #     coords_track = viasat[viasat.ID == u_track].values.tolist()
+                    #     lon_track = coords_track[0][2]
+                    #     lat_track = coords_track[0][3]
+                    #     coords_u = gdf_nodes[gdf_nodes.index == u][['x', 'y']].values.tolist()
+                    #     lon_u = coords_u[0][0]
+                    #     lat_u = coords_u[0][1]
+                    #     # convert decimal degrees to radians
+                    #     lon1, lat1, lon2, lat2 = map(radians, [lon_track, lat_track, lon_u, lat_u])
+                    #
+                    #     # haversine formula
+                    #     dlon = lon2 - lon1
+                    #     dlat = lat2 - lat1
+                    #     a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+                    #     c = 2 * asin(sqrt(a))
+                    #     r = 6371 # Radius of earth in kilometers. Use 3956 for miles
+                    #     return c * r # Kilometers
+
+
+                    # define distance between two GPS tracks (viasat measurements)
+                    # def great_circle_track(u):
+                    #     # Calculate the great circle distance between two points from viasat data (progressive)
+                    #     u_track = nodes_dict.get(u)[0][2]
+                    #     v_track = u_track+1
+                    #     if v_track <= max(viasat.ID):
+                    #         distance =int((viasat[viasat['ID'] == v_track]).progressive) - int((viasat[viasat['ID'] == u_track]).progressive)
+                    #         distance = distance/1000 # in Km
+                    #     else:
+                    #         distance = 0
+                    #     return distance
+
+
                     # "sigma" has been calculated as the standard deviation of all the distances between viasat measurements and nodes
                     # SIGMA_Z = 1.4826*np.median(DISTANCES) # meters
                     SIGMA_Z = 1.4826*np.median([x[0] for x in DISTANCES]) # meters
                     # SIGMA_Z = SIGMA_Z/1000 # Kilometers
+
 
                     ###############################
                     ### emission probability ######
@@ -462,7 +506,26 @@ def func(arg):
                                     distance_VIASAT = abs(distance_VIASAT) / 1000  # in Km
                                     # add distance to a dictionary in function of edge "u"
                                     distance_between_points[u] = distance_VIASAT
+                                    # time spent to travel from one point to te next one (in seconds)
+                                    # time_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).path_time) - int(
+                                    #     (viasat[viasat['ID'] == track_list[i]]).path_time)
+                                    # # add time to a dictionary in function of edge "u"
+                                    # time_track[u] = time_VIASAT
+                                    # HOUR_track[u] = int((viasat[viasat['ID'] == track_list[i]]).hour)
+                                    # timedate_track[u] = ((viasat[viasat['ID'] == track_list[i]]).timedate).to_string()[4:23]
 
+                                    # mean speed between two points (tracks)
+                                    # if int((viasat[viasat['ID'] == track_list[i + 1]]).speed) == 0:
+                                    #     speed_VIASAT = int((viasat[viasat['ID'] == track_list[i]]).speed)
+                                    # elif int((viasat[viasat['ID'] == track_list[i]]).speed) == 0:
+                                    #     speed_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).speed)
+                                    # else:
+                                    #     speed_VIASAT = (int(
+                                    #         (viasat[viasat['ID'] == track_list[i + 1]]).speed) + int(
+                                    #         (viasat[viasat['ID'] == track_list[i]]).speed)) / 2
+                                    #
+                                    # # add speed to a dictionary in function of edge "u"
+                                    # speed_between_points[u] = speed_VIASAT
                                     if u != v:
                                         try:
                                             if u != v:
@@ -474,6 +537,7 @@ def func(arg):
                                                     emiss_prob[u] = emission_prob(u)
                                         except nx.NetworkXNoPath:
                                             pass
+
 
                             if len(trans_prob) != 0:
                                 MAX_trans_key = max(trans_prob, key=trans_prob.get)
@@ -506,7 +570,26 @@ def func(arg):
                                             distance_VIASAT = abs(distance_VIASAT) / 1000  # in Km
                                             # add distance to a dictionary in function of edge "u"
                                             distance_between_points[u] = distance_VIASAT
+                                            # time spent to travel from one point to te next one (in seconds)
+                                            # time_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).path_time) - int(
+                                            #     (viasat[viasat['ID'] == track_list[i]]).path_time)
+                                            # # add time to a dictionary in function of edge "u"
+                                            # time_track[u] = time_VIASAT
+                                            # HOUR_track[u] = int((viasat[viasat['ID'] == track_list[i]]).hour)
+                                            # timedate_track[u]=((viasat[viasat['ID'] == track_list[i]]).timedate).to_string()[4:23]
 
+                                            # mean speed between two points (tracks)
+                                            # if int((viasat[viasat['ID'] == track_list[i + 1]]).speed) == 0:
+                                            #     speed_VIASAT = int((viasat[viasat['ID'] == track_list[i]]).speed)
+                                            # elif int((viasat[viasat['ID'] == track_list[i]]).speed) == 0:
+                                            #     speed_VIASAT = int((viasat[viasat['ID'] == track_list[i + 1]]).speed)
+                                            # else:
+                                            #     speed_VIASAT = (int(
+                                            #         (viasat[viasat['ID'] == track_list[i + 1]]).speed) + int(
+                                            #         (viasat[viasat['ID'] == track_list[i]]).speed)) / 2
+                                            #
+                                            # # add speed to a dictionary in function of edge "u"
+                                            # speed_between_points[u] = speed_VIASAT
                                             if u != v:
                                                 try:
                                                     if u != v:
@@ -526,6 +609,9 @@ def func(arg):
                                     if MAX_trans_value != 0:
                                         # compare distance: node-GPS track with node-edge
                                         if MAX_emiss_key in DISTANCES_dict.keys():
+                                            # if MAX_trans_key != MAX_emiss_key and DISTANCES_dict[MAX_emiss_key] > emiss_prob[MAX_emiss_key]:
+                                            #    max_prob_node.append(MAX_emiss_key)
+                                            # else:
                                             max_prob_node.append(MAX_trans_key)
                                         else:
                                             if MAX_trans_key != MAX_emiss_key:
@@ -771,15 +857,17 @@ def func(arg):
                         # edges_matched_route_GV['id'] = edges_matched_route_GV['id'].bfill()
                         edges_matched_route_GV['id'] = edges_matched_route_GV['id'].ffill()
                         edges_matched_route_GV['id'] = edges_matched_route_GV['id'].bfill()
-                        # edges_matched_route_GV['id'].fillna(-1)
-                        # try:
-                        edges_matched_route_GV['id'] = edges_matched_route_GV.id.astype('int')
-                        # except ValueError:
-                        #     pass
+                        try:
+                            edges_matched_route_GV['id'] = edges_matched_route_GV.id.astype('int')
+                        except ValueError:
+                             pass
 
                         edges_matched_route_GV['idtrajectory'] = edges_matched_route_GV['idtrajectory'].ffill()
                         edges_matched_route_GV['idtrajectory'] = edges_matched_route_GV['idtrajectory'].bfill()
-                        edges_matched_route_GV['idtrajectory'] = edges_matched_route_GV.idtrajectory.astype('int')
+                        try:
+                            edges_matched_route_GV['idtrajectory'] = edges_matched_route_GV.idtrajectory.astype('int')
+                        except ValueError:
+                            pass
 
                         edges_matched_route_GV['totalseconds'] = edges_matched_route_GV['totalseconds'].ffill()
                         edges_matched_route_GV['totalseconds'] = edges_matched_route_GV['totalseconds'].bfill()
@@ -829,8 +917,8 @@ def func(arg):
                         edges_matched_route_GV['mean_speed'] = edges_matched_route_GV.mean_speed.astype('int')
                         edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].ffill()
                         edges_matched_route_GV['TRIP_ID'] = edges_matched_route_GV['TRIP_ID'].bfill()
-                        # edges_matched_route_GV['track_ID'] = edges_matched_route_GV['track_ID'].ffill()
-                        # edges_matched_route_GV['track_ID'] = edges_matched_route_GV['track_ID'].bfill()
+                        edges_matched_route_GV['idterm'] = edges_matched_route_GV['idterm'].ffill()
+                        edges_matched_route_GV['idterm'] = edges_matched_route_GV['idterm'].bfill()
                         ## remove rows with negative "mean_speed"...for now....
                         edges_matched_route_GV = edges_matched_route_GV[edges_matched_route_GV['mean_speed'] > 0]
                         edges_matched_route_GV = edges_matched_route_GV[edges_matched_route_GV['mean_speed'] < 190]
@@ -840,7 +928,7 @@ def func(arg):
                             ## populate a DB
                             try:
                                 final_map_matching_table_GV = edges_matched_route_GV[['idtrajectory',
-                                                                                      'u', 'v',
+                                                                                      'u', 'v', 'idterm',
                                                                                       'idtrace', 'sequenza',
                                                                                       'mean_speed',
                                                                                       'timedate',
@@ -853,13 +941,29 @@ def func(arg):
                                 ## final_map_matching_table_GV['geom'] = final_map_matching_table_GV['geometry'].apply(wkb_hexer)
                                 ## final_map_matching_table_GV.drop('geometry', 1, inplace=True)
 
-                                final_map_matching_table_GV.to_sql("mapmatching_UNIBS_november_2019", con=connection, schema="public",
+                                final_map_matching_table_GV.to_sql("mapmatching", con=connection, schema="public",
                                                  if_exists='append')
 
+                                #################################################################
+                                #################################################################
+                                ### find the travelled distance of the matched route
+                                sum_distance_mapmatching = sum(final_map_matching_table_GV.length)
+                                ## calculate the accuracy of the matched route compared to the sum of the differences of the progressives (from Viasat data)
+                                ###  ACCURACY: ([length of the matched trajectory] / [length of the travelled distance (sum  delta progressives)])*100
+                                try:
+                                    accuracy = int(int((sum_distance_mapmatching / sum_progressive) * 100))
+                                    df_accuracy = pd.DataFrame({'accuracy': [accuracy], 'TRIP_ID': [trip]})
+                                    df_accuracy.to_sql("accuracy", con=connection, schema="public",
+                                                     if_exists='append')
+                                except ZeroDivisionError:
+                                    pass
                                 connection.close()
+
                             except KeyError:
                                 pass
     return
+
+
 
 ################################################
 ##### run all script using multiprocessing #####
@@ -872,7 +976,7 @@ if __name__ == '__main__':
     # pool = mp.Pool(processes=mp.cpu_count()) ## use all available processors
     pool = mp.Pool(processes=55)     ## use 60 processors
     print("++++++++++++++++ POOL +++++++++++++++++", pool)
-    results = pool.map(func, [(last_track_idx, track_ID) for last_track_idx, track_ID in enumerate(idterm_UNIBS)])
+    results = pool.map(func, [(last_track_idx, track_ID) for last_track_idx, track_ID in enumerate(all_ID_TRACKS)])
     pool.close()
     pool.close()
     pool.join()

@@ -18,25 +18,29 @@ os.chdir('D:/ViaSat/Brescia')
 cwd = os.getcwd()
 
 # connect to new DB to be populated with Viasat data after route-check
-conn_HAIG = db_connect.connect_HAIG_Viasat_BS()
+conn_HAIG = db_connect.connect_HAIG_BRESCIA()
 cur_HAIG = conn_HAIG.cursor()
 
 
-## create extension postgis on the database HAIG_Viasat_RM_2019  (only one time)
+## create extension postgis on the database HAIG_BRESCIA  (only one time)
 
-# cur_HAIG.execute("""
-# CREATE EXTENSION postgis
-# """)
 
-# cur_HAIG.execute("""
-#  CREATE EXTENSION postgis_topology
-# """)
+'''
 
-# conn_HAIG.commit()
+cur_HAIG.execute("""
+    CREATE EXTENSION postgis
+""")
+
+cur_HAIG.execute("""
+CREATE EXTENSION postgis_topology
+""")
+conn_HAIG.commit()
+
+'''
 
 
 # Create an SQL connection engine to the output DB
-engine = sal.create_engine('postgresql://postgres:superuser@10.0.0.1:5432/HAIG_Viasat_BS')
+engine = sal.create_engine('postgresql://postgres:superuser@10.1.0.1:5432/HAIG_BRESCIA')
 connection = engine.connect()
 
 # erase existing table
@@ -47,6 +51,8 @@ connection = engine.connect()
 ######################################################################
 ## create OBU table ##################################################
 ######################################################################
+
+os.chdir('D:/ViaSat/Brescia/obu')
 
 ## load .csv file with idterm and vehicle type info
 ## create table with idterm, vehicle type and put into a DB

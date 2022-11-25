@@ -30,7 +30,7 @@ def tempo(Testo, T_ini):
     #        Chiamate success.   Delta_T= tempo( 'Dpoo For: ', t0)  
     #
     #        La prima chiamata serve per fissare il tempo di riferimento             
-    #==================================================================
+    #================================C==================================
     T_attuale = time.clock()
     DT = T_attuale - T_ini
     if Testo=='INIZIO: ':

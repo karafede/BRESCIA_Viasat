@@ -12,6 +12,7 @@ cwd = os.getcwd()
 
 # connect to new DB to be populated with Viasat data after route-check
 conn_HAIG = db_connect.connect_HAIG_Viasat_BS()
+# conn_HAIG = db_connect.connect_HAIG_Viasat_RM_2019()
 cur_HAIG = conn_HAIG.cursor()
 
 
@@ -173,6 +174,17 @@ CREATE index dataraw_id_idx on public.dataraw("id");
 """)
 conn_HAIG.commit()
 
+
+
+cur_HAIG.execute("""
+CREATE index dataraw_lat_idx on public.dataraw(latitude);
+""")
+conn_HAIG.commit()
+
+cur_HAIG.execute("""
+CREATE index dataraw_lon_idx on public.dataraw(longitude);
+""")
+conn_HAIG.commit()
 
 ###########################################################
 ##### Check size DB and tables ############################
@@ -517,12 +529,17 @@ viasat_cars = pd.read_sql_query('''
 idterms_cars = list(viasat_cars.idterm.unique())
 len(idterms_cars)
 
+
+### get all terminals corresponding to 'cars' and 'fleet' (from routecheck_2019)
+count_idterm = pd.read_sql_query('''
+              SELECT vehtype, COUNT(*)
+              /*FROM public.routecheck_november_2019*/
+              FROM public.routecheck_march_2019 
+              group by vehtype ''', conn_HAIG)
+
 ## NUMBERS of idterms ###
 ## March 2019 --> cars: 26739    ; fleet:5095
 ## November 2019 --> cars: 22137; fleet:4421
-
-
-
 
 
 ################################################################
@@ -541,8 +558,6 @@ viasat_data['date'] = viasat_data['timedate'].apply(lambda x: x.strftime("%Y-%m-
 viasat_data = viasat_data.sort_values('timedate')
 # viasat_data.drop_duplicates(['date'], inplace=True)
 viasat_data.to_csv('D:/ENEA_CAS_WORK/BRESCIA/viasat_data_4033118.csv')
-
-
 
 
 '''
@@ -567,3 +582,124 @@ conn_HAIG.commit()
 # df_viaggi1 = pd.read_csv('D:\\ENEA_CAS_WORK\\BRESCIA\\df_Viag_0_20000_auto.csv', delimiter=',')
 # df_viaggi2 = pd.read_csv('D:\\ENEA_CAS_WORK\\BRESCIA\\df_Viag_20001_40000_auto.csv', delimiter=',')
 # tot_len = len(df_viaggi1) + len(df_viaggi2)
+
+
+
+idterms = pd.read_sql_query(
+            ''' select *
+                FROM idterm_portata ''', conn_HAIG)
+idterms = idterms.sort_values('idterm')
+
+
+####################################################################
+####################################################################
+from shapely import wkb
+import geopandas as gpd
+# Function to generate WKB hex
+def wkb_hexer(line):
+    return line.wkb_hex
+
+## function to transform Geometry from text to LINESTRING
+def wkb_tranformation(line):
+   return wkb.loads(line.geom, hex=True)
+
+
+## load EDGES from OSM
+route = pd.read_sql_query('''
+                            SELECT *
+                            FROM route_2019 
+                            /*LIMIT 1000*/''',conn_HAIG)
+### transform "geom" into a Linestring
+route['geometry'] = route.apply(wkb_tranformation, axis=1)
+route.drop(['geom'], axis=1, inplace= True)
+route = gpd.GeoDataFrame(route)
+# route.plot()
+
+
+
+## load EDGES from OSM
+nights = pd.read_sql_query('''
+                            SELECT *
+                            FROM nights_py 
+                            /*LIMIT 1000*/''',conn_HAIG)
+### transform "geom" into Points
+nights['geometry'] = nights.apply(wkb_tranformation, axis=1)
+nights.drop(['geom'], axis=1, inplace= True)
+nights = gpd.GeoDataFrame(nights)
+# nights.plot()
+
+
+## load EDGES from OSM
+residenze = pd.read_sql_query('''
+                            SELECT *
+                            FROM residenze_py 
+                            /*LIMIT 1000*/''',conn_HAIG)
+### transform "geom" into Points
+residenze['geometry'] = residenze.apply(wkb_tranformation, axis=1)
+residenze.drop(['geom'], axis=1, inplace= True)
+residenze = gpd.GeoDataFrame(residenze)
+# residenze.plot()
+
+####################################################################################
+### create basemap (Roma)
+import folium
+
+ave_LAT = 41.888009265234906
+ave_LON = 12.500281904062206
+
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
+####################################################################################
+
+
+### plot georeferenced POINTS
+## https://jingwen-z.github.io/how-to-draw-a-variety-of-maps-with-folium-in-python/
+
+## get longitude and latitude of each point
+nights['longitude'] = nights['geometry'].x
+nights['latitude'] = nights['geometry'].y
+
+for i, v in nights.iterrows():
+    popup = (v['n_nights'])
+    folium.CircleMarker(location=[v['latitude'], v['longitude']],
+                        radius=1,
+                        tooltip=popup,
+                        color='#FFBA00',
+                        fill_color='#FFBA00',
+                        fill=True).add_to(my_map)
+
+path = 'D:/ENEA_CAS_WORK/ROMA_2019/'
+my_map.save(path + "number_nights_ROMA_2019.html")
+
+
+
+####################################################################################
+### create basemap (Roma)
+import folium
+
+ave_LAT = 41.888009265234906
+ave_LON = 12.500281904062206
+
+my_map = folium.Map([ave_LAT, ave_LON], zoom_start=11, tiles='cartodbpositron')
+####################################################################################
+
+
+### plot georeferenced POINTS
+## https://jingwen-z.github.io/how-to-draw-a-variety-of-maps-with-folium-in-python/
+
+## get longitude and latitude of each point
+residenze['longitude'] = residenze['geometry'].x
+residenze['latitude'] = residenze['geometry'].y
+
+for i, v in residenze.iterrows():
+    popup = (v['n_points'])
+    folium.CircleMarker(location=[v['latitude'], v['longitude']],
+                        radius=1,
+                        tooltip=popup,
+                        color='#FFBA00',
+                        fill_color='#FFBA00',
+                        fill=True).add_to(my_map)
+
+path = 'D:/ENEA_CAS_WORK/ROMA_2019/'
+my_map.save(path + "number_residenze_ROMA_2019.html")
+
+

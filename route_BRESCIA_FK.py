@@ -165,8 +165,8 @@ def func(arg):
             ### zip the coordinates into a point object and convert to a GeoData Frame ####
             if len(data) > 1:
                 ## find outliers
-                q = data["progressive"].quantile(0.99)
-                data = data[data["progressive"] <= q]
+                # q = data["progressive"].quantile(0.99)
+                # data = data[data["progressive"] <= q]
                 if len(data) > 1:
                     geometry = [Point(xy) for xy in zip(data.longitude, data.latitude)]
                     df = GeoDataFrame(data, geometry=geometry)
@@ -212,7 +212,7 @@ def func(arg):
                     ### find distance between coordinates of two consecutive TRIPS in METERS!!!
                     deviation_pos = great_circle_track_node(lon_end, lat_end, lon_start, lat_start)
                     ### build the final dataframe ("route" table)
-                    if tripdistance_m > 0:
+                    if tripdistance_m > 0 and triptime_s <= 25200 and breaktime_s > 60 and triptime_s > 0:  ## <----------
                         df_ROUTE = pd.DataFrame({'idtrajectory': [idtrajectory],
                                                  'idterm': [idterm],
                                                  'idtrace_o': [idtrace_o],
